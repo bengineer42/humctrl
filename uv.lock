@@ -183,27 +183,42 @@ wheels = [
 [[package]]
 name = "flyball"
 source = { editable = "../../controller" }
+dependencies = [
+    { name = "pydantic" },
+]
 
 [package.optional-dependencies]
 web = [
     { name = "fastapi" },
+    { name = "pyyaml" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "bluesky", marker = "extra == 'bluesky'", specifier = ">=1.13" },
     { name = "fastapi", marker = "extra == 'all'", specifier = ">=0.115" },
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.115" },
     { name = "httpx", marker = "extra == 'all'", specifier = ">=0.27" },
     { name = "httpx", marker = "extra == 'cli'", specifier = ">=0.27" },
+    { name = "ophyd", marker = "extra == 'bluesky'", specifier = ">=1.9" },
+    { name = "pydantic", specifier = ">=2.9" },
+    { name = "pymeasure", marker = "extra == 'pymeasure'", specifier = ">=0.13" },
+    { name = "pymodbus", marker = "extra == 'modbus'", specifier = ">=3.6" },
     { name = "pyserial", marker = "extra == 'all'", specifier = ">=3.5" },
     { name = "pyserial", marker = "extra == 'serial'", specifier = ">=3.5" },
+    { name = "pyvisa", marker = "extra == 'visa'", specifier = ">=1.14" },
+    { name = "pyvisa-py", marker = "extra == 'visa'", specifier = ">=0.7" },
+    { name = "pyyaml", marker = "extra == 'all'", specifier = ">=6" },
+    { name = "pyyaml", marker = "extra == 'cli'", specifier = ">=6" },
+    { name = "pyyaml", marker = "extra == 'web'", specifier = ">=6" },
+    { name = "qcodes", marker = "extra == 'qcodes'", specifier = ">=0.45" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'all'", specifier = ">=0.32" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'web'", specifier = ">=0.32" },
     { name = "websockets", marker = "extra == 'all'", specifier = ">=13" },
     { name = "websockets", marker = "extra == 'cli'", specifier = ">=13" },
 ]
-provides-extras = ["all", "cli", "serial", "web"]
+provides-extras = ["all", "bluesky", "cli", "modbus", "pymeasure", "qcodes", "serial", "visa", "web"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -214,6 +229,11 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "ruff", specifier = ">=0.8" },
     { name = "types-pyserial" },
+]
+docs = [
+    { name = "griffe-pydantic", specifier = ">=1.0" },
+    { name = "mkdocs-material", specifier = ">=9.5" },
+    { name = "mkdocstrings", extras = ["python"], specifier = ">=0.26" },
 ]
 
 [[package]]

@@ -206,7 +206,9 @@ class DualPumpsBlender(Actuator, Observer):
         """Which supply sensors to follow. Call before attaching to the rig."""
         self.dry = dry
         self.wet = wet
-        self.observes = frozenset(source for source in (dry, wet) if source is not None)
+        # Channels, not sources: the rig hands a channel observer the Reading
+        # that ``observe`` matches on; a source observer would get the Sample.
+        self.observes = frozenset(source.humidity for source in (dry, wet) if source is not None)
 
     def _update_demand(self, demand: Percent) -> None:
         if self._demand != demand:
@@ -233,7 +235,7 @@ class DualPumpsBlender(Actuator, Observer):
             return self._update_outputs(self.pumps.set_flows(SupplyFlows(dry, wet)))
 
     @command
-    def set_blend(self, flow: BlendFlow, wet_fraction: Normalised) -> PumpsState:
+    def set_fraction(self, flow: BlendFlow, wet_fraction: Normalised) -> PumpsState:
         """Split a total flow between the lines by wet fraction."""
         with self.lock:
             return self._update_outputs(self.pumps.set_blend(flow, wet_fraction))
@@ -251,6 +253,14 @@ class DualPumpsBlender(Actuator, Observer):
             self.pumps.stop()
             self._update_outputs(self.pumps.output)
 
+    @command
+    def set_blend(self, flow: BlendFlow, humidity: Humidity) -> PumpsState:
+        """Blend for a target humidity at a total flow; the wet fraction follows the supplies."""
+        with self.lock:
+            self._update(humidity, flow=flow)
+            self._apply()
+            return self.output
+
     def _update(
         self,
         demand: Percent | None,
@@ -264,28 +274,6 @@ class DualPumpsBlender(Actuator, Observer):
         if flow is not None:
             self._update_flow(flow)
         return self._updated
-
-    def update_flow(self, flow: BlendFlow) -> None:
-        with self.lock:
-            self._update_flow(flow)
-
-    def update_demand(self, demand: Percent) -> None:
-        with self.lock:
-            self._update_demand(demand)
-
-    def update_readings(self, dry: Percent | None = None, wet: Percent | None = None) -> None:
-        with self.lock:
-            self._update_readings(dry, wet)
-
-    def update(
-        self,
-        demand: Percent | None,
-        dry: Percent | None = None,
-        wet: Percent | None = None,
-        flow: BlendFlow | None = None,
-    ) -> bool:
-        with self.lock:
-            return self._update(demand, dry, wet, flow)
 
     def _update_outputs(self, output: PumpsState) -> PumpsState:
         self.pump_error = None
@@ -301,29 +289,17 @@ class DualPumpsBlender(Actuator, Observer):
             self._update_outputs(self.pumps.set_blend(self.blend_flow, float(fraction)))
             self._updated = False
 
-    @command(tag="blend")
-    def update_blend(
-        self,
-        demand: Humidity | None = None,
-        dry: Humidity | None = None,
-        wet: Humidity | None = None,
-        flow: BlendFlow | None = None,
-    ) -> None:
-        """Re-blend for a new demand, supply humidities or total flow; omitted ones stand."""
-        with self.lock:
-            self._update(demand, dry, wet, flow)
-            self._apply()
-
     def set_demand(self, demand: float) -> None:
         with self.lock:
             self._update_demand(demand)
 
     def observe(self, reading: Reading) -> None:
-        match reading.source:
-            case self.wet:
-                self.update_readings(wet=reading.value)
-            case self.dry:
-                self.update_readings(dry=reading.value)
+        with self.lock:
+            match reading.source:
+                case self.wet:
+                    self._update_readings(wet=reading.value)
+                case self.dry:
+                    self._update_readings(dry=reading.value)
 
     def apply(self) -> None:
         with self.lock:
