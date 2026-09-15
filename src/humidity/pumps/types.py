@@ -7,6 +7,8 @@ from typing import NamedTuple, Self
 from flyball.core.typing import NonNegative, Normalised, Percent, Positive
 from flyball.core.utils import Labelled
 
+from humidity.units import Flow, Humidity
+
 
 class OnOverdrive(Labelled):
     """How to handle a requested flow change that exceeds the maximum."""
@@ -17,18 +19,18 @@ class OnOverdrive(Labelled):
 
 @dataclass(frozen=True, slots=True)
 class Absolute:
-    value: NonNegative
+    flow: Flow
     on_overdrive: OnOverdrive = OnOverdrive.RAISE
 
 
 @dataclass(frozen=True, slots=True)
 class OfBlendMax:
-    value: Normalised = 1.0
+    blend_fraction: Normalised = 1.0
 
 
 @dataclass(frozen=True, slots=True)
 class OfGuaranteedMax:
-    value: Normalised = 1.0
+    guaranteed_max_fraction: Normalised = 1.0
 
 
 type BlendFlow = Absolute | OfBlendMax | OfGuaranteedMax
@@ -169,8 +171,8 @@ type DryWetLike = DryWetOps | tuple[float, float] | list[float] | float
 
 @dataclass(slots=True, frozen=True)
 class SupplyHumidities(DryWet):
-    dry: RelativeHumidity
-    wet: RelativeHumidity
+    dry: Humidity
+    wet: Humidity
 
 
 @dataclass(slots=True)
@@ -187,8 +189,8 @@ DefaultHumidities = SupplyHumidities(dry=0.0, wet=100.0)
 
 @dataclass(slots=True, frozen=True)
 class SupplyFlows(DryWet):
-    dry: NonNegative
-    wet: NonNegative
+    dry: Flow
+    wet: Flow
 
     @classmethod
     def from_blend(cls, total: NonNegative, wet_fraction: Normalised) -> SupplyFlows:
@@ -317,7 +319,7 @@ MaxFlowsDefault = MaxFlows(dry=1.0, wet=1.0)
 @dataclass(slots=True, frozen=True)
 class PumpState:
     effort: Normalised
-    flow: NonNegative
+    flow: Flow
 
 
 @dataclass(slots=True, frozen=True)
@@ -329,7 +331,7 @@ class PumpsState:
 @dataclass(slots=True, frozen=True)
 class CurrentBlend:
     wet_fraction: Normalised
-    flow: NonNegative
+    flow: Flow
 
 
 @dataclass(slots=True, frozen=True)

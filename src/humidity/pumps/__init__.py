@@ -13,6 +13,7 @@ from .types import (
     DryWet,
     MaxFlows,
     MaxFlowsLike,
+    MutSupplyHumidities,
     OfBlendMax,
     OfGuaranteedMax,
     OnOverdrive,
@@ -26,6 +27,7 @@ from .types import (
     SupplyEffortsLike,
     SupplyFlows,
     SupplyFlowsLike,
+    SupplyHumidities,
     SupplyHumiditiesLike,
 )
 
@@ -44,6 +46,7 @@ __all__ = [
     "FlowsOverdrivenError",
     "MaxFlows",
     "MaxFlowsLike",
+    "MutSupplyHumidities",
     "OfBlendMax",
     "OfGuaranteedMax",
     "OnOverdrive",
@@ -59,5 +62,6 @@ __all__ = [
     "SupplyEffortsLike",
     "SupplyFlows",
     "SupplyFlowsLike",
+    "SupplyHumidities",
     "SupplyHumiditiesLike",
 ]

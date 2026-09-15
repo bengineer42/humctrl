@@ -7,14 +7,12 @@ from .drivers import DualPumpDriver
 from .errors import FlowsOverdrivenError
 from .types import (
     Absolute,
-    Blend,
     BlendFlow,
     CurrentBlend,
     MaxFlows,
     MaxFlowsLike,
     OfBlendMax,
     OnOverdrive,
-    PumpsMode,
     PumpsSpec,
     PumpsState,
     PumpState,
@@ -151,14 +149,16 @@ class DualPumps:
         wet_fraction: Normalised,
     ) -> PumpsState:
         if isinstance(flow, Absolute):
-            flows = SupplyFlows.from_blend(flow.value, wet_fraction)
+            flows = SupplyFlows.from_blend(flow.flow, wet_fraction)
             if flow.on_overdrive == OnOverdrive.RAISE and not flows.is_valid(self.max_flows):
                 self.raise_flow_overdriven(flows, wet_fraction)
             flows = flows.derated(self.max_flows)
         elif isinstance(flow, OfBlendMax):
-            flows = self.max_flows.flows_at_blend(wet_fraction) * flow.value
+            flows = self.max_flows.flows_at_blend(wet_fraction) * flow.blend_fraction
         else:
-            flows = SupplyFlows.from_blend(flow.value * self.guaranteed_max_flow, wet_fraction)
+            flows = SupplyFlows.from_blend(
+                flow.guaranteed_max_fraction * self.guaranteed_max_flow, wet_fraction
+            )
         efforts = flows.to_efforts(self.max_flows)
 
         return self.set_efforts(efforts)
@@ -172,14 +172,6 @@ class DualPumps:
 
     def set_efforts(self, efforts: SupplyEffortsLike) -> PumpsState:
         return self.efforts_to_outputs(self.pumps.set_efforts(SupplyEfforts.of(efforts)))
-
-    def set_mode(self, mode: PumpsMode) -> PumpsState:
-        if isinstance(mode, Blend):
-            return self.set_blend(*mode)
-        if isinstance(mode, SupplyEfforts):
-            return self.set_efforts(mode)
-        if isinstance(mode, SupplyFlows):
-            return self.set_flows(mode)
 
     def stop(self) -> None:
         self.pumps.stop()

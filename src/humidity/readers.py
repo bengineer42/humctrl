@@ -12,8 +12,8 @@ from flyball.core import (
     Source,
 )
 from flyball.core.reading import Reader
-from flyball.units import DIMENSIONLESS
-from flyball.units.si import Celsius
+from flyball.core.units import DIMENSIONLESS
+from flyball.core.units.si import Celsius
 
 # Relative humidity is a ratio; the symbol says which ratio.
 PercentRH = DIMENSIONLESS.unit("percent relative humidity", "%RH", 0.01)

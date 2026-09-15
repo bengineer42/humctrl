@@ -1,5 +1,5 @@
 from flyball.core.config import Config, ConfigOr, resolve
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_serializer
 
 from humidity.pumps.types import MaxFlowsDefault, MaxFlowsLike
 
@@ -15,6 +15,11 @@ class DualPumpsConfig(Config[DualPumps]):
     units: str | None = None
     max_flows: MaxFlowsLike = MaxFlowsDefault
     driver: ConfigOr[DualPumpDriver]
+
+    @field_serializer("driver")
+    def _serialize_driver(self, driver: ConfigOr[DualPumpDriver]) -> object:
+        """A built driver has no wire form; report what it is rather than fail the view."""
+        return driver if isinstance(driver, Config) else {"type": type(driver).__name__}
 
     def build(self) -> DualPumps:
         return DualPumps(

@@ -1,28 +1,27 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from threading import RLock
 
-from flyball.control import Actuator
-from flyball.core import Normalised, Observer, Percent, Positive, Reading, require
+from flyball.core import Normalised, Observer, Percent, Reading, require
 from flyball.core.errors import NotReadyError, UnachievableError
+from flyball.core.sink import Actuator, ActuatorConfig, ActuatorState, command
 
 from humidity.pumps import (
     BlendFlow,
     DefaultBlendFlow,
     DualPumps,
-    PumpsState,
-    SupplyFlows,
-)
-from humidity.pumps.types import (
-    MaxFlows,
     MutSupplyHumidities,
-    PumpsMode,
-    SupplyEffortsLike,
-    SupplyFlowsLike,
+    PumpsState,
+    SupplyEfforts,
+    SupplyFlows,
     SupplyHumidities,
     SupplyHumiditiesLike,
 )
+from humidity.pumps.config import DualPumpsConfig
 from humidity.readers import HTSource
+from humidity.units import Flow, Humidity, PercentRH
 
 
 class BlenderError(Exception): ...
@@ -86,7 +85,7 @@ def expected_humidity_from_flows(
     flows: SupplyFlows, humidities: SupplyHumidities
 ) -> Percent | None:
     total = flows.total
-    return None if total else (flows * humidities).total / total
+    return (flows * humidities).total / total if total else None
 
 
 def calculate_wet_fraction(
@@ -102,44 +101,42 @@ def calculate_wet_fraction(
     return (target - humidities.dry) / humidities.difference
 
 
-@dataclass(frozen=True, slots=True)
-class BlenderState(PumpsState):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class BlenderState(ActuatorState):
+    demand: Humidity | None = None  # narrows the base field; kw_only makes the order legal
+    flows: SupplyFlows
+    efforts: SupplyEfforts
     humidities: SupplyHumidities
-    demand: Percent | None
-    expected_humidity: Percent | None
+    expected_humidity: Humidity | None
 
 
-@dataclass(frozen=True, slots=True)
-class BlenderConfig:
-    max_flows: MaxFlows
-    full_range_max_flow: Positive
-    flow_units: str | None
-    blend_flow: BlendFlow
+class BlenderConfig(ActuatorConfig["DualPumpsBlender"]):
+    pumps: DualPumpsConfig
+    humidities: SupplyHumidities
+    blend_flow: BlendFlow = DefaultBlendFlow
+    default_demand: Humidity | None = None
+    name: str = "pumps"
 
-
-@dataclass(frozen=True, slots=True)
-class BlenderView(BlenderState):
-    max_flows: MaxFlows
-    full_range_max_flow: Positive
-    flow_units: str | None
-    blend_flow: BlendFlow
-
-    @classmethod
-    def of(cls, spec: BlenderConfig, state: BlenderState) -> "BlenderView":
-        return cls(
-            humidities=state.humidities,
-            demand=state.demand,
-            flows=state.flows,
-            efforts=state.efforts,
-            expected_humidity=state.expected_humidity,
-            blend_flow=spec.blend_flow,
-            full_range_max_flow=spec.full_range_max_flow,
-            flow_units=spec.flow_units,
-            max_flows=spec.max_flows,
+    def build(self) -> DualPumpsBlender:
+        return DualPumpsBlender(
+            self.pumps.build(),
+            self.humidities,
+            flow=self.blend_flow,
+            name=self.name,
+            demand=self.default_demand,
+            config=self,
         )
 
 
-class DualPumpsBlender(Actuator, Observer):
+# What a command accepts over the wire: the ``*Like`` aliases also admit the
+# in-process ``DryWetOps`` classes, which have no schema.
+type FlowsIn = SupplyFlows | tuple[Flow, Flow] | Flow
+type EffortsIn = SupplyEfforts | tuple[Normalised, Normalised] | Normalised
+
+
+class DualPumpsBlender(Actuator[BlenderConfig, BlenderState], Observer):
+    demand_unit = PercentRH
+
     pumps: DualPumps
     _humidities: MutSupplyHumidities
     lock: RLock
@@ -158,15 +155,18 @@ class DualPumpsBlender(Actuator, Observer):
         demand: Percent | None = None,
         flow: BlendFlow = DefaultBlendFlow,
         name: str = "pumps",
+        config: BlenderConfig | None = None,
     ) -> None:
         super().__init__(name)
         self.pumps = pumps
         self.blend_flow = flow
         self._demand = demand
         self._humidities = MutSupplyHumidities.of(humidities)
+        self.output = pumps.output
         self.expected_humidity = None
         self.lock = RLock()
         self.touches = frozenset((self,))
+        self._config = config
 
     @property
     def supply_humidities(self) -> SupplyHumidities:
@@ -181,13 +181,18 @@ class DualPumpsBlender(Actuator, Observer):
         return require(self._demand, DemandNotSetError)
 
     @property
-    def spec(self) -> BlenderConfig:
-        pumps = self.pumps.spec
+    def config(self) -> BlenderConfig:
+        """The config this was built from, or one describing it around the live driver."""
+        if self._config is not None:
+            return self._config
         return BlenderConfig(
-            max_flows=pumps.max_flows,
-            full_range_max_flow=pumps.guaranteed_max_flow,
-            flow_units=pumps.units,
+            pumps=DualPumpsConfig(
+                units=self.pumps.units, max_flows=self.pumps.max_flows, driver=self.pumps.pumps
+            ),
+            humidities=self.supply_humidities,
             blend_flow=self.blend_flow,
+            default_demand=self._demand,
+            name=self.name,
         )
 
     @property
@@ -199,10 +204,6 @@ class DualPumpsBlender(Actuator, Observer):
             efforts=self.output.efforts,
             expected_humidity=self.expected_humidity,
         )
-
-    @property
-    def view(self) -> BlenderView:
-        return BlenderView.of(self.spec, self.state)
 
     def set_channels(self, dry: HTSource | None, wet: HTSource | None) -> None:
         """Which supply sensors to follow. Call before attaching to the rig."""
@@ -228,23 +229,27 @@ class DualPumpsBlender(Actuator, Observer):
             self._updated = True
             self._humidities.wet = wet
 
-    def set_supply_flows(self, flows: SupplyFlowsLike) -> PumpsState:
+    @command(tag="set_flows")
+    def set_supply_flows(self, flows: FlowsIn) -> PumpsState:
+        """Drive each pump at a flow; one number sets both."""
         with self.lock:
             return self._update_outputs(self.pumps.set_flows(flows))
 
+    @command
     def set_blend(self, flow: BlendFlow, wet_fraction: Normalised) -> PumpsState:
+        """Split a total flow between the lines by wet fraction."""
         with self.lock:
             return self._update_outputs(self.pumps.set_blend(flow, wet_fraction))
 
-    def set_supply_efforts(self, efforts: SupplyEffortsLike) -> PumpsState:
+    @command(tag="set_efforts")
+    def set_supply_efforts(self, efforts: EffortsIn) -> PumpsState:
+        """Drive each pump at a fraction of full effort; one number sets both."""
         with self.lock:
             return self._update_outputs(self.pumps.set_efforts(efforts))
 
-    def set_pumps(self, pump_mode: PumpsMode) -> PumpsState:
-        with self.lock:
-            return self._update_outputs(self.pumps.set_mode(pump_mode))
-
+    @command(tag="stop")
     def stop_pumps(self) -> None:
+        """Stop both pumps."""
         with self.lock:
             self.pumps.stop()
             self._update_outputs(self.pumps.output)
@@ -299,13 +304,15 @@ class DualPumpsBlender(Actuator, Observer):
             self._update_outputs(self.pumps.set_blend(self.blend_flow, float(fraction)))
             self._updated = False
 
+    @command(tag="blend")
     def update_blend(
         self,
-        demand: Percent | None = None,
-        dry: Percent | None = None,
-        wet: Percent | None = None,
+        demand: Humidity | None = None,
+        dry: Humidity | None = None,
+        wet: Humidity | None = None,
         flow: BlendFlow | None = None,
     ) -> None:
+        """Re-blend for a new demand, supply humidities or total flow; omitted ones stand."""
         with self.lock:
             self._update(demand, dry, wet, flow)
             self._apply()
