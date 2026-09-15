@@ -1,9 +1,8 @@
 """Daemon entry point.
 
-Builds a rig, attaches it to the HTTP server and runs in the foreground. Nothing
-here forks or writes a PID file: systemd ``Type=simple`` supervises the process
-directly, and :mod:`humidity.cli` drives it over the same HTTP API the browser
-uses.
+Builds a rig, attaches it to the HTTP server and runs in the foreground for
+systemd `Type=simple` to supervise. [humidity.cli][] drives it over the same HTTP
+API the browser uses.
 """
 
 from __future__ import annotations
@@ -24,18 +23,7 @@ log = logging.getLogger("humidity.daemon")
 
 
 def build_rig(args: argparse.Namespace) -> HumRig:
-    """A rig on real hardware.
-
-    The imports are local because they only resolve on a Pi: pulling blinka in
-    at module scope would stop the daemon importing anywhere else, including in
-    ``--simulate`` mode.
-
-    Args:
-        args: Parsed command line, supplying the pump, PWM and sensor settings.
-
-    Returns:
-        A manager wired to the real pumps and sensors.
-    """
+    """A rig on real hardware. Imports are local because they only resolve on a Pi."""
     from humidity.direct import I2CSHT4x, LinuxPWMPump
 
     pumps = DualPumps(

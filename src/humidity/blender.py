@@ -28,9 +28,8 @@ class BlenderError(Exception): ...
 class HumidityRailError(BlenderError, UnachievableError):
     """The target humidity is outside the range the two lines can mix to.
 
-    Reported on :class:`StreamState` rather than raised: the blend rails to the
-    nearest achievable end and the run continues. No amount of pump capacity
-    fixes it, so the remedy is a wetter or drier supply, not more flow.
+    Reported in state rather than raised: the blend rails to the nearest end
+    and the run continues. The remedy is a wetter or drier supply, not flow.
     """
 
     def __init__(
@@ -43,11 +42,7 @@ class HumidityRailError(BlenderError, UnachievableError):
 
 
 class SupplyHumiditiesError(BlenderError, UnachievableError):
-    """The wet and dry line humidities are not in the expected order.
-
-    Raised rather than reported: with no span between the lines there is no
-    blend to compute, so the mixing model cannot produce an answer at all.
-    """
+    """The wet and dry line humidities are not in order. Raised: with no span there is no blend."""
 
     def __init__(self, humidities: SupplyHumidities) -> None:
         super().__init__(

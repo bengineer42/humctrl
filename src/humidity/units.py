@@ -1,9 +1,7 @@
 """Units and annotated quantities for the humidity rig.
 
-Every state, config and command field with a physical meaning is typed with one
-of the ``Quantity`` aliases below, so the unit is declared once, lands in the
-schema, and is readable off the type in-process. Drivers report in exactly these
-units; conversion from a device's native unit happens in the driver.
+Every physical field is typed with a `Quantity` alias below, so the unit is
+declared once and lands in the schema. Drivers report in exactly these units.
 """
 
 from typing import Annotated
@@ -20,7 +18,7 @@ LitrePerMinute = Litre / Minute
 GramPerCubicMetre = Gram / Metre**3
 
 # --- annotated floats -------------------------------------------------------
-# Written out as ``Annotated`` rather than through a helper: a type checker only
+# Written out as `Annotated` rather than through a helper: a type checker only
 # accepts a type expression here, never the result of a call.
 
 Humidity = Annotated[float, UnitRef(PercentRH), Field(ge=0, le=100)]

@@ -1,10 +1,4 @@
-"""Domain errors, grouped by the answer they give a caller.
-
-The four bases below carry the whole classification: what a caller (or an HTTP
-client) can do about a failure, rather than which subsystem raised it. Each also
-mixes in the builtin a library consumer would reach for, so ``except LookupError``
-and ``except RuntimeError`` behave as expected without importing anything here.
-"""
+"""Domain errors for the humidity rig, classified as in `flyball.core.errors`."""
 
 from __future__ import annotations
 

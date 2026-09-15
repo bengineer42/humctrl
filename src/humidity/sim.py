@@ -1,8 +1,7 @@
 """A humidity rig with no hardware.
 
-Two pumps that remember their effort, a chamber whose humidity chases the
-blend the pumps are delivering, and one SHT4x-shaped sensor reading it.
-Enough for the UI, the programmer and the loop to be exercised on a laptop::
+Two pumps that remember their effort, a chamber whose humidity chases their
+blend, and one SHT4x-shaped sensor:
 
     python -m humidity.sim            # serve on :8000, recording to sim.db
 """
@@ -47,10 +46,9 @@ class SimPump(PumpDriver):
 
 
 class Chamber:
-    """Humidity chases what the pumps are blending; with no flow it drifts to ambient.
+    """Humidity chases the pumps' blend; with no flow it drifts to ambient.
 
-    A first-order lag with a time constant that shrinks as flow rises, so a
-    bigger blend flow settles the chamber faster, as it does in the real one.
+    A first-order lag whose time constant shrinks as flow rises.
     """
 
     def __init__(
@@ -90,7 +88,7 @@ def build_simulated_rig(
     ambient: Percent = 40.0,
     tau_s: Positive = 60.0,
 ) -> Rig:
-    """One blender on two simulated pumps, one process sensor, reading every ``period_s``."""
+    """One blender on two simulated pumps, one process sensor, reading every `period_s`."""
     rig = Rig()
     pumps = DualPumps(PumpPair(dry=SimPump(), wet=SimPump()), MaxFlows(*max_flows))
     blender = DualPumpsBlender(pumps, humidities=supply, name="pumps")

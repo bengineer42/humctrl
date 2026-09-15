@@ -15,14 +15,14 @@ SHT4X_ADDRESS = 0x44
 
 
 class CrcError(Exception):
-    """Raised when a sensor read fails due to CRC mismatch."""
+    """A sensor read failed its CRC."""
 
     def __init__(self, message: str) -> None:
         super().__init__(message)
 
 
 class SHT4xTriggerError(Exception):
-    """Raised when a sensor trigger fails."""
+    """A sensor trigger failed."""
 
     def __init__(self, source: HTSource, cause: OSError) -> None:
         self.source = source
@@ -31,7 +31,7 @@ class SHT4xTriggerError(Exception):
 
 
 class SHT4xReadError(Exception):
-    """Raised when a sensor read fails."""
+    """A sensor read failed."""
 
     def __init__(self, source: HTSource, cause: OSError | CrcError) -> None:
         self.source = source
@@ -61,10 +61,10 @@ def _decode(buf: bytes) -> tuple[Percent, float]:
 
 
 class SHT4x:
-    """One SHT4x on an :class:`I2CBus` -- the root bus or a mux lane, it does not care.
+    """One SHT4x on an `I2CBus`, root or mux lane.
 
-    Satisfies ``hardware.bank.TwoPhase``: ``trigger`` starts a conversion,
-    ``collect`` waits it out and decodes. ``read`` is the two back to back.
+    A `TwoPhase` device: `trigger` starts a conversion, `collect` waits and
+    decodes, `read` is both.
     """
 
     __slots__ = ("_addr", "_buf", "_i2c", "_lock", "seq", "source")
@@ -90,7 +90,7 @@ class SHT4x:
         return time.monotonic_ns()
 
     def collect(self, trigger_ns: int, stamp_ns: int) -> HTReading:
-        """Wait for the conversion started at ``trigger_ns``, then read and decode."""
+        """Wait for the conversion started at `trigger_ns`, then read and decode."""
         remaining = trigger_ns + _CONVERSION_NS - time.monotonic_ns()
         if remaining > 0:
             time.sleep(remaining / 1e9)

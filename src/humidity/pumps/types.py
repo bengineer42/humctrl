@@ -47,9 +47,9 @@ class Blend(NamedTuple):
 class DryWet:
     """A value for each line. Arithmetic is elementwise, with another pair or a scalar.
 
-    Operators return the operand's own class, so ``flows / max_flows`` is a
-    ``SupplyFlows``; convert with :meth:`of` where the result means something
-    else (``SupplyEfforts.of(flows / max_flows)``).
+    Operators return the left operand's class; convert with
+    [of][humidity.pumps.types.DryWet.of] when the result means something else
+    (`SupplyEfforts.of(flows / max_flows)`).
     """
 
     dry: float

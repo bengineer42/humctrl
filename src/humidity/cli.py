@@ -1,9 +1,6 @@
-"""Command line client.
+"""Command line client for a running `humidity-daemon`, over its HTTP API.
 
-Talks to a running ``humidity-daemon`` over the same HTTP API the browser uses,
-so it works against a rig on another machine and needs none of the hardware
-libraries. It deliberately imports nothing from the domain: the wire format is
-the contract.
+Imports nothing from the domain: the wire format is the contract.
 """
 
 from __future__ import annotations
@@ -70,7 +67,7 @@ def emit(args: argparse.Namespace, value: Any) -> None:
 
 
 def flatten(value: dict[str, Any], prefix: str = "") -> str:
-    """Nested dicts as indented ``key: value`` lines. Lists stay compact."""
+    """Nested dicts as indented `key: value` lines. Lists stay compact."""
     lines = []
     for key, item in value.items():
         name = f"{prefix}{key}"
