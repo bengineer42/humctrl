@@ -18,8 +18,8 @@ from flyball.core.units.si import Celsius
 # Relative humidity is a ratio; the symbol says which ratio.
 PercentRH = DIMENSIONLESS.unit("percent relative humidity", "%RH", 0.01)
 
-Temperature = Measurand("temperature", Celsius)
-Humidity = Measurand("humidity", PercentRH)
+Temperature = Measurand("temperature", Celsius, range=(-40.0, 125.0), precision=2)
+Humidity = Measurand("humidity", PercentRH, range=(0.0, 100.0), precision=1)
 
 HTMeasurands = (Humidity, Temperature)
 
@@ -65,7 +65,13 @@ class HTReading(Sample):
 
 
 class HTSetReader(Reader):
+    """Up to three humidity/temperature sensors: the process and the two supplies."""
+
     _sources: dict[HTReaderSource, HTSource]
+
+    def __init__(self, name: str, sources: dict[HTReaderSource, HTSource]) -> None:
+        super().__init__(name, sources.values())
+        self._sources = sources
 
     @property
     def process(self) -> HTSource | None:

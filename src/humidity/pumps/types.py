@@ -43,95 +43,71 @@ class Blend(NamedTuple):
     wet_fraction: Normalised
 
 
-_NUMERIC = (float, int)
+@dataclass(slots=True, frozen=True)
+class DryWet:
+    """A value for each line. Arithmetic is elementwise, with another pair or a scalar.
 
-
-def parse_values(values: object) -> tuple[float, float] | None:
-    """The pair ``values`` describes, or None if it describes none.
-
-    Takes ``object`` rather than :data:`DryWetLike`: rejecting what the alias
-    does not admit is the whole job, and a narrower annotation would make the
-    final ``return None`` unreachable.
+    Operators return the operand's own class, so ``flows / max_flows`` is a
+    ``SupplyFlows``; convert with :meth:`of` where the result means something
+    else (``SupplyEfforts.of(flows / max_flows)``).
     """
-    if isinstance(values, _NUMERIC):
-        return values, values
-    if isinstance(values, DryWet):
-        return values.dry, values.wet
-    if isinstance(values, (tuple, list)) and len(values) == 2:
-        return values[0], values[1]
-    return None
 
-
-def require_values(values: object, name: str) -> tuple[float, float]:
-    """The pair ``values`` describes.
-
-    Raises:
-        TypeError: If ``values`` describes no pair. A wrong kind of thing, not
-            a bad value -- ``ValueError`` is mapped to a 422 by the server,
-            which would report a programming error as a client one.
-    """
-    if (pair := parse_values(values)) is None:
-        raise TypeError(
-            f"{name} must be a number, a pair of numbers, or a DryWet, got {type(values).__name__}"
-        )
-    return pair
-
-
-class DryWetOps:
-    __slots__ = ()
     dry: float
     wet: float
 
-    def __init__(self, dry: float, wet: float) -> None: ...
-
     @classmethod
-    def of(cls, values: DryWetLike) -> Self:
-        return cls(*require_values(values, cls.__name__))  # pyright: ignore[reportArgumentType]
+    def of(cls, pair: DryWet) -> Self:
+        """The same two values as this class."""
+        return cls(pair.dry, pair.wet)
 
-    @classmethod
-    def of_dry_wet(cls, values: DryWetOps) -> Self:
-        return cls(values.dry, values.wet)  # pyright: ignore[reportArgumentType]
+    @staticmethod
+    def _pair(other: object) -> tuple[float, float] | None:
+        if isinstance(other, DryWet):
+            return other.dry, other.wet
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            return other, other
+        return None
 
     def __iter__(self) -> Iterator[float]:
         yield self.dry
         yield self.wet
 
-    def __truediv__(self, other: DryWetLike) -> Self:
-        if (pair := parse_values(other)) is None:
+    def __truediv__(self, other: DryWet | float) -> Self:
+        if (pair := self._pair(other)) is None:
             return NotImplemented
-        return type(self)(self.dry / pair[0], self.wet / pair[1])  # pyright: ignore[reportArgumentType]
+        return type(self)(self.dry / pair[0], self.wet / pair[1])
 
-    def __rtruediv__(self, other: DryWetLike) -> Self:
-        if (pair := parse_values(other)) is None:
+    def __rtruediv__(self, other: DryWet | float) -> Self:
+        if (pair := self._pair(other)) is None:
             return NotImplemented
-        return type(self)(pair[0] / self.dry, pair[1] / self.wet)  # pyright: ignore[reportArgumentType]
+        return type(self)(pair[0] / self.dry, pair[1] / self.wet)
 
-    def __mul__(self, other: DryWetLike) -> Self:
-        if (pair := parse_values(other)) is None:
+    def __mul__(self, other: DryWet | float) -> Self:
+        if (pair := self._pair(other)) is None:
             return NotImplemented
-        return type(self)(self.dry * pair[0], self.wet * pair[1])  # pyright: ignore[reportArgumentType]
+        return type(self)(self.dry * pair[0], self.wet * pair[1])
 
     __rmul__ = __mul__
 
-    def __add__(self, other: DryWetLike) -> Self:
-        if (pair := parse_values(other)) is None:
+    def __add__(self, other: DryWet | float) -> Self:
+        if (pair := self._pair(other)) is None:
             return NotImplemented
-        return type(self)(self.dry + pair[0], self.wet + pair[1])  # pyright: ignore[reportArgumentType]
+        return type(self)(self.dry + pair[0], self.wet + pair[1])
 
     __radd__ = __add__
 
-    def __sub__(self, other: DryWetLike) -> Self:
-        if (pair := parse_values(other)) is None:
+    def __sub__(self, other: DryWet | float) -> Self:
+        if (pair := self._pair(other)) is None:
             return NotImplemented
-        return type(self)(self.dry - pair[0], self.wet - pair[1])  # pyright: ignore[reportArgumentType]
+        return type(self)(self.dry - pair[0], self.wet - pair[1])
 
-    def __rsub__(self, other: DryWetLike) -> Self:
-        if (pair := parse_values(other)) is None:
+    def __rsub__(self, other: DryWet | float) -> Self:
+        if (pair := self._pair(other)) is None:
             return NotImplemented
-        return type(self)(pair[0] - self.dry, pair[1] - self.wet)  # pyright: ignore[reportArgumentType]
+        return type(self)(pair[0] - self.dry, pair[1] - self.wet)
 
     def __neg__(self) -> Self:
-        return type(self)(-self.dry, -self.wet)  # pyright: ignore[reportArgumentType]
+        return type(self)(-self.dry, -self.wet)
 
     @property
     def total(self) -> float:
@@ -149,24 +125,9 @@ class DryWetOps:
     def max(self) -> float:
         return max(self.dry, self.wet)
 
-    def max_with(self, *args) -> float:
-        """Return the maximum of the dry and wet values, or the maximum of the given arguments."""
-        return max(self.dry, self.wet, *args)
-
-
-@dataclass(slots=True, frozen=True)
-class DryWet(DryWetOps):
-    dry: float
-    wet: float
-
-
-@dataclass(slots=True)
-class MutDryWet(DryWetOps):
-    dry: float
-    wet: float
-
-
-type DryWetLike = DryWetOps | tuple[float, float] | list[float] | float
+    def max_with(self, *others: float) -> float:
+        """The larger line, or a larger given value."""
+        return max(self.dry, self.wet, *others)
 
 
 @dataclass(slots=True, frozen=True)
@@ -174,15 +135,6 @@ class SupplyHumidities(DryWet):
     dry: Humidity
     wet: Humidity
 
-
-@dataclass(slots=True)
-class MutSupplyHumidities(MutDryWet):
-    pass
-
-
-type SupplyHumiditiesLike = (
-    SupplyHumidities | MutSupplyHumidities | DryWetOps | tuple[Percent, Percent] | list[Percent]
-)
 
 DefaultHumidities = SupplyHumidities(dry=0.0, wet=100.0)
 
@@ -218,24 +170,18 @@ class SupplyFlows(DryWet):
         total = self.total
         return self.wet / total if total > 0 else 0.0
 
-    def is_valid(self, max_flows: MaxFlowsLike) -> bool:
-        dry_max, wet_max = require_values(max_flows, "max_flows")  # pyright: ignore[reportGeneralTypeIssues]
-        return self.dry <= dry_max and self.wet <= wet_max
+    def is_valid(self, max_flows: MaxFlows) -> bool:
+        return self.dry <= max_flows.dry and self.wet <= max_flows.wet
 
-    def to_efforts(self, max_flows: MaxFlowsLike) -> SupplyEfforts:
+    def to_efforts(self, max_flows: MaxFlows) -> SupplyEfforts:
         return SupplyEfforts.of(self / max_flows)
 
-    def to_total_humidity(self, humidities: SupplyHumiditiesLike) -> Percent | None:
+    def to_total_humidity(self, humidities: SupplyHumidities) -> Percent | None:
         total = self.total
         return (self * humidities).total / total if total > 0 else None
 
-    def derated(self, max_flows: MaxFlowsLike) -> SupplyFlows:
+    def derated(self, max_flows: MaxFlows) -> SupplyFlows:
         return self / self.to_efforts(max_flows).max_with(1.0)
-
-
-type SupplyFlowsLike = (
-    SupplyFlows | DryWetOps | tuple[NonNegative, NonNegative] | list[NonNegative] | NonNegative
-)
 
 
 @dataclass(slots=True, frozen=True)
@@ -251,8 +197,8 @@ class SupplyEfforts(DryWet):
     def overdriven(self) -> bool:
         return self.dry > 1.0 or self.wet > 1.0
 
-    def to_flows(self, max_flows: MaxFlowsLike) -> SupplyFlows:
-        return SupplyFlows.of_dry_wet(self * max_flows)
+    def to_flows(self, max_flows: MaxFlows) -> SupplyFlows:
+        return SupplyFlows.of(self * max_flows)
 
     def derated(self) -> SupplyEfforts:
         max_effort = self.max
@@ -261,19 +207,10 @@ class SupplyEfforts(DryWet):
         return self / max_effort
 
 
-type SupplyEffortsLike = (
-    SupplyEfforts | DryWetOps | tuple[Normalised, Normalised] | Normalised | list[Normalised]
-)
-
-
 class SupplyDeadbands(DryWet):
     dry: Normalised
     wet: Normalised
 
-
-type SupplyDeadbandsLike = (
-    SupplyDeadbands | DryWetOps | tuple[Normalised, Normalised] | Normalised | list[Normalised]
-)
 
 DefaultDeadbands = SupplyDeadbands(dry=0.0, wet=0.0)
 
@@ -300,17 +237,14 @@ class MaxFlows(DryWet):
     def flow_at_blend(self, wet_fraction: Normalised) -> NonNegative:
         return self.flows_at_blend(wet_fraction).total
 
-    def to_efforts(self, flows: SupplyFlowsLike) -> SupplyEfforts:
-        return SupplyEfforts.of_dry_wet(flows / self)  #
+    def to_efforts(self, flows: SupplyFlows) -> SupplyEfforts:
+        return SupplyEfforts.of(flows / self)
 
-    def to_flows(self, efforts: SupplyEffortsLike) -> SupplyFlows:
-        return SupplyFlows.of_dry_wet(efforts * self)
+    def to_flows(self, efforts: SupplyEfforts) -> SupplyFlows:
+        return SupplyFlows.of(efforts * self)
 
     def efforts_at_blend(self, wet_fraction: Normalised) -> SupplyEfforts:
         return self.to_efforts(self.flows_at_blend(wet_fraction))
-
-
-type MaxFlowsLike = MaxFlows | DryWetOps | tuple[Positive, Positive] | Positive
 
 
 MaxFlowsDefault = MaxFlows(dry=1.0, wet=1.0)
@@ -335,7 +269,9 @@ class CurrentBlend:
 
 
 @dataclass(slots=True, frozen=True)
-class PumpsSpec:
+class PumpsLimits:
+    """What the built pumps can do. Config: fixed once built."""
+
     max_flows: MaxFlows
     guaranteed_max_flow: Positive
     units: str | None
@@ -343,18 +279,7 @@ class PumpsSpec:
 
 @dataclass(slots=True, frozen=True)
 class PumpsView:
-    flows: SupplyFlows
-    efforts: SupplyEfforts
-    max_flows: MaxFlows
-    guaranteed_max_flow: Positive
-    units: str | None
+    """Limits and state at one instant."""
 
-    @classmethod
-    def of(cls, spec: PumpsSpec, output: PumpsState) -> PumpsView:
-        return cls(
-            flows=output.flows,
-            efforts=output.efforts,
-            max_flows=spec.max_flows,
-            guaranteed_max_flow=spec.guaranteed_max_flow,
-            units=spec.units,
-        )
+    limits: PumpsLimits
+    state: PumpsState

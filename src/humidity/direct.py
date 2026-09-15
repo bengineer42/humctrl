@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-from flyball.core import Channel, Normalised
+from flyball.core import Normalised
 from flyball.core.errors import UnachievableError
 from flyball.hardware import TCA9548_ADDRESS, Bank, I2CBus, I2CMux
 from linux_pwm import PWMChannel, PWMChip
@@ -23,8 +23,7 @@ class PumpFlowError(PumpError, UnachievableError):
         self.max_flow = max_flow
         self.name = name
         super().__init__(
-            f"flow {flow} exceeds max_flow {max_flow}"
-            + (f" for {name}" if name else "")
+            f"flow {flow} exceeds max_flow {max_flow}" + (f" for {name}" if name else "")
         )
 
 
@@ -69,9 +68,7 @@ class LinuxPWMPump(PumpDriver):
         self.pwm.stop()
 
 
-def labelled[T](
-    dry: T, wet: T, process: T
-) -> Generator[tuple[HTReaderSource, T], None, None]:
+def labelled[T](dry: T, wet: T, process: T) -> Generator[tuple[HTReaderSource, T], None, None]:
     yield HTReaderSource.DRY, dry
     yield HTReaderSource.WET, wet
     yield HTReaderSource.PROCESS, process
@@ -87,13 +84,11 @@ def muxed_sht4x_readers(
 ) -> Bank[HTReaderSource, HTReading]:
     """Up to three SHT4x behind a TCA9548, read together so their samples share an instant."""
     mux = I2CMux(i2c, mux_address)
-    return Bank(
-        {
-            name: SHT4x(mux.lane(port), HTSource(name), sensor_address)
-            for name, port in labelled(dry_port, wet_port, process_port)
-            if port is not None
-        }
-    )
+    return Bank({
+        name: SHT4x(mux.lane(port), HTSource(name), sensor_address)
+        for name, port in labelled(dry_port, wet_port, process_port)
+        if port is not None
+    })
 
 
 def sht4x_reader(
@@ -108,8 +103,6 @@ def sht4x_reader(
 class MuxedI2CSHT4xReaders(HTSetReader):
     bank: Bank[HTReaderSource, HTReading]
 
-    sources: dict[HTReaderSource, HTSource]
-
     def __init__(
         self,
         i2c: I2CBus,
@@ -118,22 +111,21 @@ class MuxedI2CSHT4xReaders(HTSetReader):
         wet_port: int | None = None,
         mux_address: int = TCA9548_ADDRESS,
         sensor_address: int = SHT4X_ADDRESS,
+        name: str = "sht4x",
     ) -> None:
         mux = I2CMux(i2c, mux_address)
-        self.sources = {s: HTSource(s) for s in HTReaderSource}
-        self.bank = Bank(
-            {
-                name: SHT4x(mux.lane(port), HTSource(name), sensor_address)
-                for name, port in labelled(dry_port, wet_port, process_port)
-                if port is not None
-            }
-        )
-
-    @property
-    def channels(self) -> set[Channel]:
-        return {
-            channel for source in self.sources.values() for channel in source.channels
+        # One source per fitted port; the sensor and the source share a name.
+        fitted = {
+            role: HTSource(role)
+            for role, port in labelled(dry_port, wet_port, process_port)
+            if port is not None
         }
+        super().__init__(name, fitted)
+        self.bank = Bank({
+            role: SHT4x(mux.lane(port), fitted[role], sensor_address)
+            for role, port in labelled(dry_port, wet_port, process_port)
+            if port is not None
+        })
 
     def read_process(self, time_ns: int) -> HTReading | Exception | None:
         return self.bank.read_device(time_ns, HTReaderSource.PROCESS)

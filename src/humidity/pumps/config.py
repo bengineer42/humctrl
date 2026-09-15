@@ -1,7 +1,7 @@
 from flyball.core.config import Config, ConfigOr, resolve
 from pydantic import ConfigDict, field_serializer
 
-from humidity.pumps.types import MaxFlowsDefault, MaxFlowsLike
+from humidity.pumps.types import MaxFlows, MaxFlowsDefault
 
 from .drivers import DualPumpDriver
 from .dual import DualPumps
@@ -13,7 +13,7 @@ class DualPumpsConfig(Config[DualPumps]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     units: str | None = None
-    max_flows: MaxFlowsLike = MaxFlowsDefault
+    max_flows: MaxFlows = MaxFlowsDefault
     driver: ConfigOr[DualPumpDriver]
 
     @field_serializer("driver")

@@ -18,7 +18,7 @@ from humidity.pumps import (
     DefaultHumidities,
     DualPumps,
     PumpPair,
-    SupplyHumiditiesLike,
+    SupplyHumidities,
 )
 
 
@@ -69,7 +69,7 @@ class LinuxPwmDualPumpsConfig(Config[PumpPair]):
 
 class DualPumpBlenderConfig(Config[DualPumpsBlender]):
     pumps: ConfigOr[DualPumps]
-    humidities: SupplyHumiditiesLike = DefaultHumidities
+    humidities: SupplyHumidities = DefaultHumidities
     flow: BlendFlow = DefaultBlendFlow
     demand: Percent | None = None
 

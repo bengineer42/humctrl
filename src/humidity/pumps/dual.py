@@ -10,17 +10,14 @@ from .types import (
     BlendFlow,
     CurrentBlend,
     MaxFlows,
-    MaxFlowsLike,
     OfBlendMax,
     OnOverdrive,
-    PumpsSpec,
+    PumpsLimits,
     PumpsState,
     PumpState,
     PumpsView,
     SupplyEfforts,
-    SupplyEffortsLike,
     SupplyFlows,
-    SupplyFlowsLike,
 )
 
 
@@ -32,11 +29,11 @@ class DualPumps:
     def __init__(
         self,
         pumps: DualPumpDriver,
-        max_flows: MaxFlowsLike,
+        max_flows: MaxFlows,
         units: str | None = None,
     ) -> None:
         self.pumps = pumps
-        self.max_flows = MaxFlows.of(max_flows)
+        self.max_flows = max_flows
         self.units = units
 
     @property
@@ -52,8 +49,8 @@ class DualPumps:
         return self.max_flows.guaranteed
 
     @property
-    def spec(self) -> PumpsSpec:
-        return PumpsSpec(
+    def limits(self) -> PumpsLimits:
+        return PumpsLimits(
             max_flows=self.max_flows, guaranteed_max_flow=self.guaranteed_max_flow, units=self.units
         )
 
@@ -115,17 +112,17 @@ class DualPumps:
 
     @property
     def view(self) -> PumpsView:
-        return PumpsView.of(self.spec, self.output)
+        return PumpsView(self.limits, self.output)
 
     def flow_str(self, flow: NonNegative) -> str:
         return format_quantity(flow, units=self.units)
 
-    def flows_to_efforts(self, flows: SupplyFlowsLike) -> SupplyEfforts:
+    def flows_to_efforts(self, flows: SupplyFlows) -> SupplyEfforts:
         return self.max_flows.to_efforts(flows)
 
     def validate_flows(
         self,
-        flows: SupplyFlowsLike,
+        flows: SupplyFlows,
         wet_fraction: Normalised | None = None,
     ) -> SupplyEfforts:
         efforts = self.flows_to_efforts(flows)
@@ -134,7 +131,7 @@ class DualPumps:
         return efforts
 
     def raise_flow_overdriven(
-        self, flows: SupplyFlowsLike, wet_fraction: Normalised | None = None
+        self, flows: SupplyFlows, wet_fraction: Normalised | None = None
     ) -> NoReturn:
         raise FlowsOverdrivenError(
             flows=flows,
@@ -163,15 +160,15 @@ class DualPumps:
 
         return self.set_efforts(efforts)
 
-    def efforts_to_outputs(self, efforts: SupplyEffortsLike) -> PumpsState:
-        return PumpsState(efforts=SupplyEfforts.of(efforts), flows=self.max_flows.to_flows(efforts))
+    def efforts_to_outputs(self, efforts: SupplyEfforts) -> PumpsState:
+        return PumpsState(efforts=efforts, flows=self.max_flows.to_flows(efforts))
 
-    def set_flows(self, flows: SupplyFlowsLike) -> PumpsState:
+    def set_flows(self, flows: SupplyFlows) -> PumpsState:
         efforts = self.validate_flows(flows)
         return self.set_efforts(efforts)
 
-    def set_efforts(self, efforts: SupplyEffortsLike) -> PumpsState:
-        return self.efforts_to_outputs(self.pumps.set_efforts(SupplyEfforts.of(efforts)))
+    def set_efforts(self, efforts: SupplyEfforts) -> PumpsState:
+        return self.efforts_to_outputs(self.pumps.set_efforts(efforts))
 
     def stop(self) -> None:
         self.pumps.stop()

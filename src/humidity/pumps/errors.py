@@ -6,7 +6,7 @@ from flyball.core.errors import FlyballError, HardwareError, UnachievableError
 from flyball.core.typing import Normalised, Positive
 from flyball.core.utils import format_quantity
 
-from .types import MaxFlows, SupplyFlows, SupplyFlowsLike
+from .types import MaxFlows, SupplyFlows
 
 
 class PumpError(FlyballError):
@@ -34,13 +34,13 @@ class FlowsOverdrivenError(FlowError):
 
     def __init__(
         self,
-        flows: SupplyFlowsLike,
+        flows: SupplyFlows,
         max_flows: MaxFlows,
         max_flow: Positive | None = None,
         wet_fraction: Normalised | None = None,
         units: str | None = None,
     ) -> None:
-        self.flows = SupplyFlows.of(flows)
+        self.flows = flows
         self.max_flow = max_flow or (max_flows.dry + max_flows.wet)
         self.max_flows = max_flows
         self.wet_fraction = wet_fraction
