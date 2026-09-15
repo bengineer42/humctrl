@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "humidity"
+version = "0.1.0"
+description = "Split-range humidity control rig built on flyball: SHT4x readers, dual-pump blender, daemon and CLI"
+requires-python = ">=3.12"
+authors = [{ name = "Ben Laurence" }]
+dependencies = ["flyball[web]"]
+
+classifiers = ["Private :: Do Not Upload"]
+
+[project.optional-dependencies]
+# humidity.cli is a pure HTTP client for the daemon: no hardware libraries.
+cli = ["httpx>=0.27"]
+# linux-pwm is not on PyPI; humidity.direct drives the sysfs PWM channels
+# through it, so it comes straight from the repo.
+rpi = [
+    "adafruit-blinka>=8.0",
+    "adafruit-circuitpython-sht4x>=1.0",
+    "rpi-hardware-pwm>=0.2",
+    "linux-pwm @ git+https://github.com/bengineer42/linux-pwm.git@main",
+]
+all = ["humidity[cli,rpi]"]
+
+[project.scripts]
+humidity = "humidity.cli:main"
+humidity-daemon = "humidity.daemon:main"
+
+[tool.uv.sources]
+flyball = { path = "../../controller", editable = true }
+
+# Required for the linux-pwm git direct reference in the rpi extra.
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/humidity"]
+
+[tool.ruff]
+extend = "../../controller/pyproject.toml"
+src = ["src"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["humidity"]
+strict = true
+warn_unreachable = true
