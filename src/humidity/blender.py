@@ -89,7 +89,7 @@ def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Norma
 
 
 class Mode(Labelled):
-    """What is driving the pumps: the last command, or a humidity demand."""
+    """What is driving the pumps: the last command, or a humidity demand. Starts stopped."""
 
     BLEND = "blend", "Blending to a target humidity"
     FLOWS = "flows", "Flows set directly"
@@ -136,7 +136,7 @@ class DualPumpBlender(Committable):
     expected_humidity = Output(
         "expected_humidity", "Expected humidity", HUMIDITY, range=(0.0, 100.0), precision=1
     )
-    mode = Output("mode", "Mode", vtype=Mode, initial=Mode.BLEND)
+    mode = Output("mode", "Mode", vtype=Mode, initial=Mode.STOPPED)
     blend = Setting("blend", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
 
     def __init__(
@@ -156,6 +156,7 @@ class DualPumpBlender(Committable):
         self.dry_supply_default.push(supply.dry)
         self.wet_supply_default.push(supply.wet)
         self.blend.push(Absolute(blend_flow, OnOverdrive.CLAMP))
+        self._push_readbacks()  # the pumps as found: every demand has a value from the start
 
     @property
     def _supply(self) -> SupplyHumidities:

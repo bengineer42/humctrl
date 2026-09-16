@@ -106,7 +106,7 @@ class TestTree:
         assert blender.signals["efforts.wet"].tags == {"line": "wet"}
         assert blender.dry_flow.limits == (0.0, 2.0), "from the max_flows.dry config signal"
         assert blender.humidity.limits == (0.0, 100.0)
-        assert blender.mode.value is Mode.BLEND
+        assert blender.mode.value is Mode.STOPPED, "nothing drives the pumps until asked"
         assert blender.dry_max_flow.value == pytest.approx(2.0)
 
     def test_commands_and_their_links(self) -> None:
