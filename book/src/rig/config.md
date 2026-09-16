@@ -94,12 +94,24 @@ links:
   pwm0: null
   chamber:
     tag: sim_humidity_chamber
-    dry: 10.0
-    wet: 90.0
-    tau_s: 45.0
-    initial: 40.0
-    temperature: 21.0
-    noise: 0.3
+    volume_l: 3.0                  # litres
+    dry_flow_l_per_min: 2.0        # match blender.dry.max_flow below
+    wet_flow_l_per_min: 2.0        # match blender.wet.max_flow below
+    flow_l_per_min: 1.0            # nominal total, feedforward only
+    dry_rh: 10.0                   # %RH, before drift
+    wet_rh: 90.0                   # %RH, before drift
+    ambient_rh: 45.0               # %RH the chamber leaks towards
+    exchange_per_min: 0.01         # fraction of volume/min exchanged with the room
+    initial_rh: 40.0               # %RH
+    temperature_c: 21.0            # °C, every temperature's steady baseline
+    sensor_tau_s: 3.0              # s, the chamber sensor's own lag
+    noise_rh: 0.3                  # %RH, Gaussian, chamber reading only
+    supply_noise_rh: 0.15          # %RH, Gaussian, dry/wet readings each sample
+    supply_drift_rh: 2.0           # ± %RH, slow sinusoidal supply wander (wet: 88-92)
+    supply_drift_period_s: 600.0   # s, period of the supply and temperature drift
+    temperature_noise_c: 0.05      # °C, Gaussian, every temperature reading
+    temperature_drift_c: 0.3       # ± °C, slow sinusoidal drift around temperature_c
+    flow_warming_c_per_lpm: 0.1    # °C per L/min: chamber warms a little under flow
     seed: 7
 
 devices:
@@ -118,13 +130,15 @@ devices:
         wet.temperature: { port: wet_temperature, quantity: temperature, unit: "°C" }
 
   blender:
-    driver: sim_drive
+    driver: dual_pump_blender               # the *real* driver: the chamber stands in for pwm0
     label: Pump blender (simulated)
-    bound: null                            # sim_drive follows nothing; the plant is driven directly
+    poll_s: 1
     config:
       link: chamber
-      ports:
-        humidity: { port: wet_fraction, quantity: humidity, unit: "%RH", limits: [0, 100] }
+      dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
+      wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }   # L/min
+      blend_flow: 1.0
+    bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 
 # blender.humidity -> hum_sensors.chamber.humidity: the same addresses as
 # rig.yaml, so its controllers entry needs no override here.
@@ -134,31 +148,53 @@ An overlay is a second file passed alongside the first — `flyball-daemon
 rig.yaml sim.yaml` — merged later-over-earlier: `null` deletes a key
 (here, `i2c1` and `pwm0`, so no real link is built), a new link
 (`chamber`, a `sim_humidity_chamber` plant — see [`HumidityChamber`
-below](#the-plant-sim_humidity_chamber)) is added, and `hum_sensors` /
-`blender` swap their real drivers for the generic `sim_daq` / `sim_drive`,
-both pointed at the same plant so the chamber and the pumps interact.
+below](#the-plant-sim_humidity_chamber)) is added, and `hum_sensors` swaps
+its real driver for the generic `sim_daq`. `blender` keeps its *real*
+driver, `dual_pump_blender`, unmodified: `HumidityChamber` doubles as a
+`flyball_linux.links.pwm.PwmLink` (`configure`/`enable`), so the blender
+drives it exactly as it would drive `pwm0` -- channel 0 the dry line,
+channel 1 the wet line, matching `rig.yaml`'s `dry.channel`/`wet.channel`.
+`dry.max_flow`/`wet.max_flow` above are set equal to the chamber's own
+`dry_flow_l_per_min`/`wet_flow_l_per_min`, so what the blender believes it
+delivers is what the chamber actually receives.
 
-Every address `rig.yaml` declares under `hum_sensors` is mirrored here,
-same unit and access — `sim_daq`'s `ports:` keys may contain a dot
+Every `hum_sensors` address `rig.yaml` declares is mirrored here, same
+unit and access — `sim_daq`'s `ports:` keys may contain a dot
 (`chamber.humidity: {...}`), which puts that port in a namespace exactly
-as `sht4x_set` does. `blender` is reduced to its one `[W]` target,
-`humidity`: `sim_drive` has no pump arithmetic to read back, so the manual
-`dry_flow`/`wet_flow`/`dry_effort`/`wet_effort`/`blend_flow`/
-`expected_humidity` signals have no analogue and are omitted. A program,
-dashboard or session built against `rig.yaml` runs unchanged against the
-overlay — it never demands the omitted signals.
+as `sht4x_set` does. Because `blender` is the genuine `DualPumpBlender`
+class in both files, *every* one of its signals, units, access, limits and
+commands match exactly — `dry_flow`/`wet_flow`/`dry_effort`/`wet_effort`/
+`blend_flow`/`expected_humidity` are the blender's own bookkeeping (from
+its configured `max_flow`s and the supply humidity it observes through
+`bound`), not read back from the chamber, precisely as on the real rig. A
+program, dashboard or session built against `rig.yaml` runs unchanged
+against the overlay.
 
 ## The plant: `sim_humidity_chamber`
 
-`humidity.sim.HumidityChamber`, a `MultiPlant`: one input
-(`wet_fraction`, 0 dry to 1 wet of the blend), six named outputs — one per
-leaf `hum_sensors` declares (`chamber_humidity`, `chamber_temperature`,
-`dry_humidity`, `dry_temperature`, `wet_humidity`, `wet_temperature`). The
-chamber humidity settles towards the blend's expected value on a
-first-order lag (time constant `tau_s`); the two supply lines and every
-temperature are constants — there's no thermal model behind them. Gaussian
-noise (`noise`, seeded by `seed` for repeatable tests) perturbs only the
-chamber reading.
+`humidity.sim.HumidityChamber` is two things at once:
+
+- a `MultiPlant` — `sim_daq` (`hum_sensors`) reads its six named outputs,
+  one per leaf `hum_sensors` declares (`chamber_humidity`,
+  `chamber_temperature`, `dry_humidity`, `dry_temperature`,
+  `wet_humidity`, `wet_temperature`);
+- a `PwmLink` (`configure`/`enable`) — the real `dual_pump_blender` driver
+  drives it exactly as it would a hardware PWM chip.
+
+The chamber mixes the dry and wet lines' actual delivered flow (each
+line's channel duty times its own `..._flow_l_per_min`) into a chamber of
+`volume_l`, settling on the mixing arithmetic (`wet_fraction` 0 rests at
+`dry_rh`, 1 at `wet_rh`, in between along that span), diluted further
+towards `ambient_rh` at `exchange_per_min`; the chamber's own sensor lags
+the true value by `sensor_tau_s`, plus Gaussian noise (`noise_rh`, seeded
+by `seed`). The dry and wet supplies drift slowly — a sinusoid of
+±`supply_drift_rh` over `supply_drift_period_s`, decorrelated by phase so
+they don't move in lockstep — and carry their own reading noise
+(`supply_noise_rh`); this drift feeds the *real* physics (the blender
+observes it through `bound`, same as a real sensor's drift would), not
+just the display. Every temperature drifts the same slow way around
+`temperature_c` with its own noise (`temperature_noise_c`), the chamber's
+also warming a little under total flow (`flow_warming_c_per_lpm`).
 
 ## Tunings
 
