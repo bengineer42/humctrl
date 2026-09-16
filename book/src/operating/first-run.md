@@ -99,7 +99,7 @@ humidity stop
 ```
 
 calls the blender's `stop` command directly (`POST
-/api/devices/blender/stop`) — both pumps off at once, bypassing whatever
+/api/devices/blender/commands/stop`) — both pumps off at once, bypassing whatever
 demand is pending. This does **not** touch the controller's mode: it's
 still regulating, and will move the pumps again on its next tick. To stop
 regulating as well, put the controller in manual with a program step

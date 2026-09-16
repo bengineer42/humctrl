@@ -83,7 +83,7 @@ A few things worth noticing:
   must be in the one `set` step.
 - **`command`'s `device_command`**, not `command` — the step's own tag
   already uses that word — calls `blender.stop()` exactly as `POST
-  /api/devices/blender/stop` would.
+  /api/devices/blender/commands/stop` would.
 - Every `tuning: gentle`/`tuning: brisk` swaps `blender.humidity`'s law
   bumplessly before aiming, by the stem of a file under `tunings/`.
 

@@ -122,18 +122,18 @@ def cmd_set(args: argparse.Namespace) -> None:
 
 def cmd_command(args: argparse.Namespace) -> None:
     body = parse_values(args.args) if args.args else None
-    emit(args, request(args, "POST", f"/api/devices/{args.device}/{args.name}", body))
+    emit(args, request(args, "POST", f"/api/devices/{args.device}/commands/{args.name}", body))
 
 
 def cmd_stop(args: argparse.Namespace) -> None:
-    emit(args, request(args, "POST", "/api/devices/blender/stop"))
+    emit(args, request(args, "POST", "/api/devices/blender/commands/stop"))
 
 
 def cmd_controller(args: argparse.Namespace) -> None:
     if args.at is None:
         emit(args, request(args, "GET", f"/api/controllers/{args.address}"))
         return
-    emit(args, request(args, "PUT", f"/api/controllers/{args.address}", {"at": args.at}))
+    emit(args, request(args, "PUT", f"/api/controllers/{args.address}/reference", {"at": args.at}))
 
 
 def format_frame(frame: Any, raw: bool = False) -> str:

@@ -78,7 +78,7 @@ supply humidities, so it reflects reality even between controller moves.
   (`rig.yaml`: 2.0 L/min per line).
 - `dry_effort`/`wet_effort` are limited to `[0, 1]`.
 - `stop` (a command, not a demand: `blender.stop()`, or `POST
-  /api/devices/blender/stop`) stops both pumps at once, bypassing whatever
+  /api/devices/blender/commands/stop`) stops both pumps at once, bypassing whatever
   is pending.
 
 ## Config
