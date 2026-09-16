@@ -337,7 +337,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--period", type=float, default=1.0, help="sensor read period, seconds")
     p.add_argument("--db", type=Path, default=Path("sim.db"), help="record into this SQLite file")
-    p.add_argument("--noise", type=float, default=0.3, help="humidity sensor noise, one sigma, %RH")
+    p.add_argument(
+        "--noise", type=float, default=0.3, help="humidity sensor noise, one sigma, %%RH"
+    )
     p.add_argument("--speed", type=float, default=1.0, help="rig seconds per wall second")
     p.add_argument("--no-record", action="store_true")
     p.add_argument("--log-level", default="info")
