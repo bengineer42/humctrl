@@ -16,12 +16,12 @@ from flyball.core.device import (
     DriverConfig,
     Namespace,
     Output,
-    Setting,
     command,
 )
 from flyball.core.errors import UnachievableError
 from flyball.core.signal import Limit, Section
 from flyball.core.typing import Normalised, Positive
+from flyball.core.units.dimensions import Fraction
 from flyball.core.utils import Labelled
 from flyball_linux.links.pwm import PwmLinkConfig
 from pydantic import BaseModel, ConfigDict
@@ -69,6 +69,16 @@ def expected_humidity_from_flows(flows: SupplyFlows, humidities: SupplyHumiditie
     return (flows * humidities).total / total if total else None
 
 
+def expected_humidity_from_wet_fraction(
+    wet_fraction: Normalised | Limit, humidities: SupplyHumidities
+) -> float:
+    if wet_fraction is Limit.LOW:
+        return humidities.dry
+    if wet_fraction is Limit.HIGH:
+        return humidities.wet
+    return humidities.dry + wet_fraction * humidities.difference
+
+
 def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Normalised | Limit:
     """The wet fraction for `target`, or the end it rails to: LOW is all dry, HIGH all wet."""
     if humidities.wet <= humidities.dry:
@@ -108,7 +118,7 @@ class DualPumpBlender(Committable):
     flows = Namespace("flows", "Flows")
     efforts = Namespace("efforts", "Efforts")
     max_flows = Namespace("max_flows", "Max flows")
-    supply = Namespace("supply", "Supply humidities")
+    humidities = Namespace("humidities", "Flow humidities")
     supply_defaults = Namespace("supply_defaults", "Supply humidities when unbound")
 
     dry_max_flow = max_flows.config(DRY, "Dry max flow", FLOW)
@@ -116,8 +126,8 @@ class DualPumpBlender(Committable):
     dry_supply_default = supply_defaults.config(DRY, "Dry line humidity", HUMIDITY)
     wet_supply_default = supply_defaults.config(WET, "Wet line humidity", HUMIDITY)
 
-    dry_supply = supply.input(DRY, "Dry line humidity", HUMIDITY, default=dry_supply_default)
-    wet_supply = supply.input(WET, "Wet line humidity", HUMIDITY, default=wet_supply_default)
+    dry_supply = humidities.input(DRY, "Dry line humidity", HUMIDITY, default=dry_supply_default)
+    wet_supply = humidities.input(WET, "Wet line humidity", HUMIDITY, default=wet_supply_default)
 
     humidity = Demand("humidity", "Target humidity", HUMIDITY, limits=(0.0, 100.0))
     dry_flow = flows.demand(DRY, "Dry pump flow", FLOW, limits=(0.0, dry_max_flow))
@@ -129,7 +139,11 @@ class DualPumpBlender(Committable):
         "expected_humidity", "Expected humidity", HUMIDITY, range=(0.0, 100.0), precision=1
     )
     mode = Output("mode", "Mode", vtype=Mode, initial=Mode.STOPPED)
-    blend = Setting("blend", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
+    blend = Namespace("blend", "Blend", atomic=True)
+    blend_flow = blend.setting("blend", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
+    wet_fraction = blend.demand(
+        "wet_fraction", "Wet fraction", Fraction, default=wet_supply_default
+    )
 
     def __init__(
         self,
@@ -147,7 +161,7 @@ class DualPumpBlender(Committable):
         self.wet_max_flow.push(pumps.wet_max_flow)
         self.dry_supply_default.push(supply.dry)
         self.wet_supply_default.push(supply.wet)
-        self.blend.push(Absolute(blend_flow, OnOverdrive.CLAMP))
+        self.blend_flow.push(Absolute(blend_flow, OnOverdrive.CLAMP))
         self._push_readbacks()  # the pumps as found: every demand has a value from the start
 
     @property
@@ -170,21 +184,36 @@ class DualPumpBlender(Committable):
         railed = isinstance(fraction, Limit)
         self.humidity.at_limit = fraction if railed else None
         wet = fraction.fraction if isinstance(fraction, Limit) else fraction
-        self._pumps.set_blend(self.blend.value if blend is None else blend, wet)
+        self._set_blend(time_ns, self.blend_flow.value if blend is None else blend, wet)
+
+    def _set_blend(self, time_ns: int | None, blend: BlendFlow, wet: float) -> None:
+        self._pumps.set_blend(blend, wet)
+        self.wet_fraction.push(wet)
+        self.blend_flow.push(blend)
         self._push_readbacks(time_ns)
 
-    def _push_readbacks(self, time_ns: int | None = None) -> None:
+    def _push_readbacks(
+        self,
+        time_ns: int | None = None,
+        blend: BlendFlow | None = None,
+        wet_fraction: float | None = None,
+    ) -> None:
         """What the pumps are now doing, on the flow and effort demands, and what it delivers."""
         output = self._pumps.output
-        self.dry_flow.push(output.flows.dry, time_ns)
-        self.wet_flow.push(output.flows.wet, time_ns)
-        self.dry_effort.push(output.efforts.dry, time_ns)
-        self.wet_effort.push(output.efforts.wet, time_ns)
         expected = expected_humidity_from_flows(output.flows, self._supply)
-        self.expected_humidity.push(0.0 if expected is None else expected, time_ns)
+        self.push(
+            time_ns,
+            wet_fraction=wet_fraction if wet_fraction is not None else output.flows.wet_fraction,
+            dry_flow=output.flows.dry,
+            wet_flow=output.flows.wet,
+            dry_effort=output.efforts.dry,
+            wet_effort=output.efforts.wet,
+            expected_humidity=0.0 if expected is None else expected,
+            blend=blend if blend is not None else self.blend_flow.value,
+        )
 
     @command
-    def set_blend(self, flow: BlendFlow) -> None:
+    def set_blend(self, flow: BlendFlow, humidity: Humidity) -> None:
         """Choose how much air the blend moves.
 
         An absolute flow (and what to do if the lines cannot give it), a
@@ -193,7 +222,12 @@ class DualPumpBlender(Committable):
         """
         if self.mode.value is Mode.BLEND:
             self._blend_pumps(blend=flow)  # may refuse (overdrive): then the setting stands
-        self.blend.push(flow)
+
+    @command
+    def set_fraction(self, wet_fraction) -> None:
+        """Set the wet fraction directly."""
+        if self.mode.value is Mode.BLEND:
+            self._set_blend(None, blend=self.blend_flow.value, wet=wet_fraction)
 
     @command(mode=Mode.FLOWS, interrupts=True)
     def set_flows(self, dry: Annotated[Flow, dry_flow], wet: Annotated[Flow, wet_flow]) -> None:
