@@ -99,7 +99,8 @@ class TestTree:
         assert roles["efforts.dry"] == roles["efforts.wet"] == (Role.DEMAND, Access.RPW)
         assert roles["expected_humidity"] == (Role.OUTPUT, Access.RP)
         assert roles["mode"] == (Role.OUTPUT, Access.RP)
-        assert roles["blend"] == (Role.SETTING, Access.RP)
+        assert roles["blend.flow"] == (Role.SETTING, Access.RP)
+        assert roles["blend.wet_fraction"] == (Role.DEMAND, Access.RPW)
         assert roles["max_flows.dry"] == (Role.CONFIG, Access.R)
         assert blender.signals["flows.dry"].tags == {"line": "dry"}
         assert blender.signals["efforts.wet"].tags == {"line": "wet"}
@@ -110,7 +111,9 @@ class TestTree:
 
     def test_commands_and_their_links(self) -> None:
         commands = DualPumpBlender.commands
-        assert {"set_blend", "set_flows", "set_efforts", "stop", "set_humidity"} <= set(commands)
+        expected = {"set_blend", "set_flows", "set_efforts", "set_fraction", "stop", "set_humidity"}
+        assert expected <= set(commands)
+        assert commands["set_fraction"].params["wet_fraction"].link == "blend.wet_fraction"
         assert {n: p.link for n, p in commands["set_flows"].params.items()} == {
             "dry": "flows.dry",
             "wet": "flows.wet",

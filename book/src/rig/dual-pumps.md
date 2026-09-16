@@ -18,7 +18,8 @@ per input. People run its commands, which drive the lines at once.
 | `efforts.dry`, `efforts.wet` | demand | each line's effort, 0–1 of full: the readback, set by `set_efforts` |
 | `expected_humidity` | output | what the current pump outputs should actually deliver |
 | `mode` | output | `blend`, `flows`, `efforts` or `stopped`: what is driving the pumps |
-| `blend` | setting | the flow a `humidity` demand mixes to; `set_blend` |
+| `blend.flow` | setting | the flow a `humidity` demand mixes to; `set_blend` |
+| `blend.wet_fraction` | demand | the share drawn from the wet line: the readback while blending; `set_fraction` sets it directly |
 | `max_flows.dry`, `max_flows.wet` | config | each line's maximum, the limit of its flow demand |
 
 The mode decides what a delivery does. A `humidity` demand puts the

@@ -21,7 +21,6 @@ from flyball.core.device import (
 from flyball.core.errors import UnachievableError
 from flyball.core.signal import Limit, Section
 from flyball.core.typing import Normalised, Positive
-from flyball.core.units.dimensions import Fraction
 from flyball.core.utils import Labelled
 from flyball_linux.links.pwm import PwmLinkConfig
 from pydantic import BaseModel, ConfigDict
@@ -40,7 +39,7 @@ from humidity.pumps import (
     SupplyFlows,
     SupplyHumidities,
 )
-from humidity.units import EFFORT, FLOW, HUMIDITY, Flow, Humidity
+from humidity.units import EFFORT, FLOW, HUMIDITY, WET_FRACTION, Flow, Humidity
 
 
 class BlenderError(Exception): ...
@@ -139,11 +138,9 @@ class DualPumpBlender(Committable):
         "expected_humidity", "Expected humidity", HUMIDITY, range=(0.0, 100.0), precision=1
     )
     mode = Output("mode", "Mode", vtype=Mode, initial=Mode.STOPPED)
-    blend = Namespace("blend", "Blend", atomic=True)
-    blend_flow = blend.setting("blend", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
-    wet_fraction = blend.demand(
-        "wet_fraction", "Wet fraction", Fraction, default=wet_supply_default
-    )
+    blend = Namespace("blend", "Blend")
+    blend_flow = blend.setting("flow", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
+    wet_fraction = blend.demand("wet_fraction", "Wet fraction", WET_FRACTION, limits=(0.0, 1.0))
 
     def __init__(
         self,
@@ -187,10 +184,9 @@ class DualPumpBlender(Committable):
         self._set_blend(time_ns, self.blend_flow.value if blend is None else blend, wet)
 
     def _set_blend(self, time_ns: int | None, blend: BlendFlow, wet: float) -> None:
+        """One pump write for a blend, then every readback and the setting at one instant."""
         self._pumps.set_blend(blend, wet)
-        self.wet_fraction.push(wet)
-        self.blend_flow.push(blend)
-        self._push_readbacks(time_ns)
+        self._push_readbacks(time_ns, blend=blend)
 
     def _push_readbacks(
         self,
@@ -198,41 +194,36 @@ class DualPumpBlender(Committable):
         blend: BlendFlow | None = None,
         wet_fraction: float | None = None,
     ) -> None:
-        """What the pumps are now doing, on the flow and effort demands, and what it delivers."""
-        output = self._pumps.output
-        def _push_readbacks(self, time_ns=None, blend=None, wet_fraction=None):
+        """What the pumps are now doing, on the flow and effort demands, and what it delivers.
+
+        `blend` only when given, `wet_fraction` the pumps' own unless given;
+        `expected_humidity` not at all with no flow: a None is not pushed.
+        """
         output = self._pumps.output
         self.push(
             time_ns,
-            wet_fraction=wet_fraction,                      # None: the pumps' own, below
+            wet_fraction=output.flows.wet_fraction if wet_fraction is None else wet_fraction,
             dry_flow=output.flows.dry,
             wet_flow=output.flows.wet,
             dry_effort=output.efforts.dry,
             wet_effort=output.efforts.wet,
-            expected_humidity=expected_humidity_from_flows(output.flows, self._supply),  # None when no flow
-            blend=blend,
-        )
-            self.push(
-            time_ns,
-            
-            
-            
-            
-            
-            
-            
+            expected_humidity=expected_humidity_from_flows(output.flows, self._supply),
+            blend_flow=blend,
         )
 
     @command
-    def set_blend(self, flow: BlendFlow, humidity: Humidity) -> None:
+    def set_blend(self, flow: BlendFlow) -> None:
         """Choose how much air the blend moves.
 
         An absolute flow (and what to do if the lines cannot give it), a
         fraction of the most the blend can move at this mix, or a fraction of
-        the flow guaranteed at every mix. Takes effect at once when blending.
+        the flow guaranteed at every mix. Takes effect at once when blending,
+        else at the next blend.
         """
         if self.mode.value is Mode.BLEND:
             self._blend_pumps(blend=flow)  # may refuse (overdrive): then the setting stands
+        else:
+            self.blend_flow.push(flow)
 
     @command
     def set_fraction(self, wet_fraction) -> None:

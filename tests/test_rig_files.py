@@ -86,7 +86,7 @@ def test_the_overlay_mirrors_every_signal_rig_yaml_and_sim_yaml_both_declare() -
     assert (
         set(sim_blender.commands)
         == set(real_blender.commands)
-        == {"stop", "set_blend", "set_flows", "set_efforts", "set_humidity"}
+        == {"stop", "set_blend", "set_flows", "set_efforts", "set_fraction", "set_humidity"}
     )
 
 

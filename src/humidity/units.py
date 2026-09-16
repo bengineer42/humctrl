@@ -31,6 +31,8 @@ LitrePerMinute = Litre / Minute
 FLOW = Quantity("flow", LitrePerMinute)
 EFFORT = Quantity("effort", One)
 """A pump's drive, 0 to 1 of full."""
+WET_FRACTION = Quantity("wet fraction", One)
+"""The share of the blend drawn from the wet line, 0 to 1."""
 
 # --- annotated floats, for pydantic config fields ---------------------------
 
@@ -51,6 +53,7 @@ __all__ = [
     "FLOW",
     "HUMIDITY",
     "TEMPERATURE",
+    "WET_FRACTION",
     "Flow",
     "Humidity",
     "LitrePerMinute",
