@@ -200,16 +200,27 @@ class DualPumpBlender(Committable):
     ) -> None:
         """What the pumps are now doing, on the flow and effort demands, and what it delivers."""
         output = self._pumps.output
-        expected = expected_humidity_from_flows(output.flows, self._supply)
+        def _push_readbacks(self, time_ns=None, blend=None, wet_fraction=None):
+        output = self._pumps.output
         self.push(
             time_ns,
-            wet_fraction=wet_fraction if wet_fraction is not None else output.flows.wet_fraction,
+            wet_fraction=wet_fraction,                      # None: the pumps' own, below
             dry_flow=output.flows.dry,
             wet_flow=output.flows.wet,
             dry_effort=output.efforts.dry,
             wet_effort=output.efforts.wet,
-            expected_humidity=0.0 if expected is None else expected,
-            blend=blend if blend is not None else self.blend_flow.value,
+            expected_humidity=expected_humidity_from_flows(output.flows, self._supply),  # None when no flow
+            blend=blend,
+        )
+            self.push(
+            time_ns,
+            
+            
+            
+            
+            
+            
+            
         )
 
     @command
