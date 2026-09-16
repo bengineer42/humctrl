@@ -25,10 +25,23 @@ devices:
         chamber: { address: 0x44 }
         dry: { address: 0x45 }
         wet: { address: 0x46 }
-    signals:
-      chamber: { signals: { humidity: { warn: [20, 80] } } }
-      dry: { poll_s: 5 }     # the supply lines drift slowly; no need to poll them as often
-      wet: { poll_s: 5 }
+    signals:                               # labels and a `line` tag: what the UI titles and filters by
+      chamber:
+        label: Chamber
+        tags: { line: chamber }
+        signals:
+          humidity: { label: Chamber humidity, warn: [20, 80] }
+          temperature: { label: Chamber temperature }
+      dry:                                 # the supply lines drift slowly; no need to poll them as often
+        label: Dry line
+        poll_s: 5
+        tags: { line: dry }
+        signals: { humidity: { label: Dry line humidity }, temperature: { label: Dry line temperature } }
+      wet:
+        label: Wet line
+        poll_s: 5
+        tags: { line: wet }
+        signals: { humidity: { label: Wet line humidity }, temperature: { label: Wet line temperature } }
 
   blender:                                 # two pumps blended into one settable humidity
     driver: dual_pump_blender
