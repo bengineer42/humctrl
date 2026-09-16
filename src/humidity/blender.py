@@ -10,10 +10,11 @@ directly, bypassing the arithmetic; `stop` is a command, not a demand.
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
 
-from flyball.core.device import Device, DriverConfig, command
+from flyball.core.device import Device, DeviceSettings, DriverConfig, command
 from flyball.core.errors import UnachievableError
 from flyball.core.signal import Access, Node, Reading, Sample, Signal, SignalSpec, WriteState
 from flyball.core.typing import Normalised, Positive
@@ -22,6 +23,7 @@ from pydantic import BaseModel, ConfigDict
 
 from humidity.pumps import (
     Absolute,
+    BlendFlow,
     DefaultHumidities,
     DualPumps,
     MaxFlows,
@@ -36,6 +38,12 @@ from humidity.units import EFFORT, FLOW, HUMIDITY, Humidity
 
 
 class BlenderError(Exception): ...
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class BlenderSettings(DeviceSettings):
+    blend: BlendFlow
+    """How much air the blend moves: absolute, of the blend's or of the guaranteed maximum."""
 
 
 class HumidityRailError(BlenderError, UnachievableError):
@@ -141,8 +149,19 @@ class DualPumpBlender(Device):
         self._pumps = pumps
         self._supply = supply
         self._target = (supply.dry + supply.wet) / 2.0
-        self._blend_flow = blend_flow
+        self._blend: BlendFlow = Absolute(blend_flow, OnOverdrive.CLAMP)
+        self._rail: Literal["low", "high"] | None = None
         self._expected_humidity = expected_humidity_from_flows(pumps.flows, supply)
+
+    @property
+    def settings(self) -> BlenderSettings:
+        return BlenderSettings(blend=self._blend)
+
+    @property
+    def _blend_flow(self) -> float:
+        """The total flow the pumps put out: the `blend_flow` readback, honest in every mode."""
+        flows = self._pumps.flows
+        return flows.dry + flows.wet
 
     def observe(self, event: Reading | Sample) -> None:
         """A bound supply line published a new humidity: record it, ready for the next `commit`."""
@@ -160,20 +179,19 @@ class DualPumpBlender(Device):
         dry_flow, wet_flow = self.signals["dry_flow"], self.signals["wet_flow"]
         dry_effort, wet_effort = self.signals["dry_effort"], self.signals["wet_effort"]
         humidity, blend_flow = self.signals["humidity"], self.signals["blend_flow"]
-        rail: Literal["low", "high"] | None = None
+        self._rail = None
         if dry_flow in pending or wet_flow in pending:
             self._pumps.set_flows(SupplyFlows(pending[dry_flow], pending[wet_flow]))
         elif dry_effort in pending or wet_effort in pending:
             self._pumps.set_efforts(SupplyEfforts(pending[dry_effort], pending[wet_effort]))
         else:
             self._target = pending.get(humidity, self._target)
-            self._blend_flow = pending.get(blend_flow, self._blend_flow)
-            fraction = calculate_wet_fraction(self._supply, self._target)
-            if isinstance(fraction, Rail):
-                rail = "low" if fraction is Rail.DRY else "high"
-            self._pumps.set_blend(Absolute(self._blend_flow, OnOverdrive.CLAMP), float(fraction))
+            if blend_flow in pending:  # a plain number: an absolute flow, clamped to the lines
+                self._blend = Absolute(pending[blend_flow], OnOverdrive.CLAMP)
+            self._blend_pumps()
         self._expected_humidity = expected_humidity_from_flows(self._pumps.flows, self._supply)
         states: dict[Signal, WriteState] = {}
+        rail = self._rail
         for signal, value in pending.items():
             states[signal] = (
                 WriteState(value=value, at_limit=rail)
@@ -183,6 +201,27 @@ class DualPumpBlender(Device):
         self.written.update(states)
         pending.clear()
         return states
+
+    def _blend_pumps(self) -> None:
+        """Put the blend on the pumps: the wet fraction for the target, the flow `_blend` says."""
+        fraction = calculate_wet_fraction(self._supply, self._target)
+        self._rail = (
+            ("low" if fraction is Rail.DRY else "high") if isinstance(fraction, Rail) else None
+        )
+        self._pumps.set_blend(self._blend, float(fraction))
+
+    @command
+    def set_blend(self, flow: BlendFlow) -> BlenderSettings:
+        """Choose how much air the blend moves.
+
+        An absolute flow (and what to do if the lines cannot give it), a
+        fraction of the most the blend can move at this mix, or a fraction of
+        the flow guaranteed at every mix. Takes effect at once when blending.
+        """
+        self._blend = flow
+        self._blend_pumps()
+        self._expected_humidity = expected_humidity_from_flows(self._pumps.flows, self._supply)
+        return self.settings
 
     def read(self, time_ns: int, node: Node | None = None) -> Iterator[Sample]:
         """The setting and every readback, computed from the pumps -- no bus I/O."""

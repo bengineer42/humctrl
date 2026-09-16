@@ -83,7 +83,7 @@ def test_the_overlay_mirrors_every_signal_rig_yaml_and_sim_yaml_both_declare() -
         assert mirrored.unit is signal.unit
         assert mirrored.access == signal.access
         assert mirrored.limits == signal.limits
-    assert set(sim_blender.commands) == set(real_blender.commands) == {"stop"}
+    assert set(sim_blender.commands) == set(real_blender.commands) == {"stop", "set_blend"}
 
 
 def test_the_default_controller_settles_the_chamber_towards_its_reference() -> None:
