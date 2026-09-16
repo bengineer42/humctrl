@@ -9,7 +9,7 @@ import pytest
 from flyball.control import Transfer
 from flyball.control.laws import P
 from flyball.core.device import Readable
-from flyball.core.signal import Access, Node, NodeSpec, Role, Sample, SignalSpec
+from flyball.core.signal import Access, Limit, Node, NodeSpec, Role, Sample, SignalSpec
 from flyball.core.typing import Normalised
 from flyball_linux.links.pwm import FakePwm
 
@@ -18,7 +18,6 @@ from humidity.blender import (
     DualPumpBlenderConfig,
     Mode,
     PumpLineConfig,
-    Rail,
     SupplyConfig,
     SupplyHumiditiesError,
     calculate_wet_fraction,
@@ -223,8 +222,8 @@ class TestRail:
 
     def test_calculate_wet_fraction_rails_and_raises_on_a_bad_span(self) -> None:
         humidities = SupplyHumidities(dry=10.0, wet=90.0)
-        assert calculate_wet_fraction(humidities, 5.0) is Rail.DRY
-        assert calculate_wet_fraction(humidities, 95.0) is Rail.WET
+        assert calculate_wet_fraction(humidities, 5.0) is Limit.LOW
+        assert calculate_wet_fraction(humidities, 95.0) is Limit.HIGH
         assert calculate_wet_fraction(humidities, 50.0) == pytest.approx(0.5)
         with pytest.raises(SupplyHumiditiesError):
             calculate_wet_fraction(SupplyHumidities(dry=90.0, wet=10.0), 50.0)

@@ -36,19 +36,20 @@ its commands.
 wet fraction 0–1, given the supply humidities:
 
 ```python
-def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Normalised | Rail:
+def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Normalised | Limit:
     if humidities.wet <= humidities.dry:
         raise SupplyHumiditiesError(humidities)
     if target < humidities.dry:
-        return Rail.DRY
+        return Limit.LOW
     if target > humidities.wet:
-        return Rail.WET
+        return Limit.HIGH
     return (target - humidities.dry) / humidities.difference
 ```
 
-A target outside `[dry, wet]` doesn't raise — it rails to the nearer end,
-and the delivery's write state for `humidity` reports `at_limit: "low"` or
-`"high"`. Only a wet-humidity-not-greater-than-dry configuration raises
+A target outside `[dry, wet]` doesn't raise — it rails to the nearer end
+(`flyball.core.signal.Limit`, the same enum the rig's clamp reports), and
+the delivery's write state for `humidity` carries it as `at_limit: "low"`
+or `"high"`. Only a wet-humidity-not-greater-than-dry configuration raises
 (`SupplyHumiditiesError`): with no span there is nothing to blend.
 
 The fraction, `blend` (the setting) and `pumps.set_blend(...)` then

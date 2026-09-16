@@ -8,7 +8,6 @@ split-range arithmetic once per delivery. `mode` says which is in force.
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import Annotated
 
 from flyball.core.device import (
@@ -21,7 +20,7 @@ from flyball.core.device import (
     command,
 )
 from flyball.core.errors import UnachievableError
-from flyball.core.signal import Section
+from flyball.core.signal import Limit, Section
 from flyball.core.typing import Normalised, Positive
 from flyball.core.utils import Labelled
 from flyball_linux.links.pwm import PwmLinkConfig
@@ -65,26 +64,19 @@ class SupplyHumiditiesError(BlenderError, UnachievableError):
         )
 
 
-class Rail(Enum):
-    WET = "wet"
-    DRY = "dry"
-
-    def __float__(self) -> float:
-        return 1.0 if self is Rail.WET else 0.0
-
-
 def expected_humidity_from_flows(flows: SupplyFlows, humidities: SupplyHumidities) -> float | None:
     total = flows.total
     return (flows * humidities).total / total if total else None
 
 
-def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Normalised | Rail:
+def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Normalised | Limit:
+    """The wet fraction for `target`, or the end it rails to: LOW is all dry, HIGH all wet."""
     if humidities.wet <= humidities.dry:
         raise SupplyHumiditiesError(humidities)
     if target < humidities.dry:
-        return Rail.DRY
+        return Limit.LOW
     if target > humidities.wet:
-        return Rail.WET
+        return Limit.HIGH
     return (target - humidities.dry) / humidities.difference
 
 
@@ -175,10 +167,10 @@ class DualPumpBlender(Committable):
     def _blend_pumps(self, time_ns: int | None = None, blend: BlendFlow | None = None) -> None:
         """Put the blend on the pumps: the wet fraction for the target, the flow `blend` says."""
         fraction = calculate_wet_fraction(self._supply, self._target)
-        self.humidity.at_limit = (
-            ("low" if fraction is Rail.DRY else "high") if isinstance(fraction, Rail) else None
-        )
-        self._pumps.set_blend(self.blend.value if blend is None else blend, float(fraction))
+        railed = isinstance(fraction, Limit)
+        self.humidity.at_limit = fraction if railed else None
+        wet = fraction.fraction if isinstance(fraction, Limit) else fraction
+        self._pumps.set_blend(self.blend.value if blend is None else blend, wet)
         self._push_readbacks(time_ns)
 
     def _push_readbacks(self, time_ns: int | None = None) -> None:
