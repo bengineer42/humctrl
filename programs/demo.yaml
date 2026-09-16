@@ -17,10 +17,10 @@ description: >-
   Manual pumps, P then PID regulation, ramps, an unwaited ramp caught by
   arrive, an operator wait.
 steps:
-  # --- by hand: the controller stays manual, the blender takes demands directly ---
-  - set: { device: blender, values: { dry_flow: 2, wet_flow: 2 } }
+  # --- by hand: the controller stays manual, the blender's commands drive the pumps ---
+  - command: { device: blender, device_command: set_flows, args: { dry: 2, wet: 2 } }
   - hold: { minutes: 2, message: "2 L/min each way: the chamber heads for the midpoint of the supplies" }
-  - set: { device: blender, values: { dry_effort: 0.1, wet_effort: 0.9 } }
+  - command: { device: blender, device_command: set_efforts, args: { dry: 0.1, wet: 0.9 } }
   - hold: { minutes: 2, message: "wet-heavy efforts: humidity climbs" }
   - command: { device: blender, device_command: stop }
   - hold: { minutes: 1, message: "pumps stopped: drifting back towards ambient" }

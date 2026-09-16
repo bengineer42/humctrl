@@ -8,15 +8,16 @@ from typing import Any
 import pytest
 from flyball.control import Transfer
 from flyball.control.laws import P
-from flyball.core.device import Device
+from flyball.core.device import Readable
 from flyball.core.errors import ConflictError
-from flyball.core.signal import Access, Node, NodeSpec, Sample, SignalSpec
+from flyball.core.signal import Access, Node, NodeSpec, Role, Sample, SignalSpec
 from flyball.core.typing import Normalised
 from flyball_linux.links.pwm import FakePwm
 
 from humidity.blender import (
     DualPumpBlender,
     DualPumpBlenderConfig,
+    Mode,
     PumpLineConfig,
     Rail,
     SupplyConfig,
@@ -47,7 +48,7 @@ class RecordingPump:
         self._effort = 0.0
 
 
-class Sensors(Device):
+class Sensors(Readable):
     """A dry supply line and the chamber, each an atomic namespace, `[RP]` humidity."""
 
     TREE = (
@@ -93,41 +94,97 @@ def sensors(rig: Any, fresh: Any) -> Sensors:
 
 
 class TestTree:
-    def test_access(self, blender: DualPumpBlender) -> None:
-        assert {s.name: s.access for s in blender.signals.values()} == {
-            "humidity": Access.W,
-            "dry_flow": Access.RPW,
-            "wet_flow": Access.RPW,
-            "dry_effort": Access.RPW,
-            "wet_effort": Access.RPW,
-            "blend_flow": Access.RW,
-            "expected_humidity": Access.RP,
+    def test_roles_access_and_sections(self, blender: DualPumpBlender) -> None:
+        roles = {path: (s.role, s.access) for path, s in blender.signals.items()}
+        assert roles["humidity"] == (Role.DEMAND, Access.RPW)
+        assert roles["flows.dry"] == roles["flows.wet"] == (Role.DEMAND, Access.RPW)
+        assert roles["efforts.dry"] == roles["efforts.wet"] == (Role.DEMAND, Access.RPW)
+        assert roles["expected_humidity"] == (Role.OUTPUT, Access.RP)
+        assert roles["mode"] == (Role.OUTPUT, Access.RP)
+        assert roles["blend"] == (Role.SETTING, Access.RP)
+        assert roles["max_flows.dry"] == (Role.CONFIG, Access.R)
+        assert blender.signals["flows.dry"].tags == {"line": "dry"}
+        assert blender.signals["efforts.wet"].tags == {"line": "wet"}
+        assert blender.dry_flow.limits == (0.0, 2.0), "from the max_flows.dry config signal"
+        assert blender.humidity.limits == (0.0, 100.0)
+        assert blender.mode.value is Mode.BLEND
+        assert blender.dry_max_flow.value == pytest.approx(2.0)
+
+    def test_commands_and_their_links(self) -> None:
+        commands = DualPumpBlender.commands
+        assert {"set_blend", "set_flows", "set_efforts", "stop", "set_humidity"} <= set(commands)
+        assert {n: p.link for n, p in commands["set_flows"].params.items()} == {
+            "dry": "flows.dry",
+            "wet": "flows.wet",
         }
-        assert blender.signals["dry_flow"].limits == (0.0, 2.0)
-        assert blender.signals["humidity"].limits == (0.0, 100.0)
+        assert commands["set_flows"].mode is Mode.FLOWS
+        assert commands["stop"].owner_exempt
+        assert commands["set_humidity"].demand_of == "humidity"
+        assert "set_flows_dry" not in commands, "a demand a command sets gets no setter"
 
 
-class TestTogether:
-    def test_a_lone_dry_flow_is_refused(self, rig: Any, blender: DualPumpBlender) -> None:
-        with pytest.raises(ConflictError, match=f"'{blender.name}.dry_flow' is set with wet_flow"):
-            rig.demand(blender.root, {"dry_flow": 0.4})
-        assert blender.pending == {}
-
-    def test_a_lone_dry_effort_is_refused(self, rig: Any, blender: DualPumpBlender) -> None:
-        with pytest.raises(
-            ConflictError, match=f"'{blender.name}.dry_effort' is set with wet_effort"
-        ):
-            rig.demand(blender.root, {"dry_effort": 0.5})
-
-    def test_both_together_commits_a_manual_flow(
+class TestCommands:
+    def test_set_flows_drives_the_lines_and_changes_the_mode(
         self,
         rig: Any,
         blender: DualPumpBlender,
         pumps: tuple[DualPumps, RecordingPump, RecordingPump],
     ) -> None:
         _, dry, wet = pumps
-        rig.demand(blender.root, {"dry_flow": 0.4, "wet_flow": 0.6})
+        rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
         assert dry.calls == [0.2] and wet.calls == [0.3], "flow / max_flow"
+        assert blender.mode.value is Mode.FLOWS
+        assert blender.dry_flow.value == pytest.approx(0.4)
+        assert blender.dry_effort.value == pytest.approx(0.2), "the readbacks follow the pumps"
+        assert rig.router.reading(blender.signals["last.set_flows"]) is not None
+
+    def test_a_line_left_out_keeps_its_current_flow(
+        self,
+        rig: Any,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, wet = pumps
+        rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
+        rig.run_command(blender, "set_flows", {"wet": 1.0})
+        assert dry.calls[-1] == pytest.approx(0.2) and wet.calls[-1] == pytest.approx(0.5)
+
+    def test_a_flow_past_the_line_s_max_is_clamped(
+        self,
+        rig: Any,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, _ = pumps
+        rig.run_command(blender, "set_flows", {"dry": 5.0, "wet": 0.0})
+        assert dry.calls == [1.0]
+
+    def test_a_manual_flow_survives_a_supply_reading(
+        self,
+        rig: Any,
+        sensors: Sensors,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, _ = pumps
+        dry_h = sensors.signals["dry.humidity"]
+        rig.bind_inputs(blender, {"dry": dry_h.address})
+        rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
+        rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 5.0})])
+        assert dry.calls == [0.2], "not in BLEND: the supply reading does not re-blend"
+        rig.demand(blender.root, {"humidity": 50.0})
+        assert blender.mode.value is Mode.BLEND and len(dry.calls) == 2
+
+    def test_a_command_is_refused_while_a_controller_drives_the_target(
+        self, rig: Any, sensors: Sensors, blender: DualPumpBlender
+    ) -> None:
+        chamber_h = sensors.signals["chamber.humidity"]
+        controller = rig.attach_controller(blender.humidity, chamber_h, law=P(kp=1.0))
+        controller.regulate(50.0, transfer=Transfer.RESET)
+        with pytest.raises(ConflictError, match="is driven by controller"):
+            rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
+        rig.run_command(blender, "stop")  # exempt
+        assert blender.mode.value is Mode.STOPPED
 
 
 class TestOneCommitPerDelivery:
@@ -142,7 +199,7 @@ class TestOneCommitPerDelivery:
         dry_h = sensors.signals["dry.humidity"]
         chamber_h = sensors.signals["chamber.humidity"]
         rig.bind_inputs(blender, {"dry": dry_h.address})
-        controller = rig.attach_controller(blender.signals["humidity"], chamber_h, law=P(kp=1.0))
+        controller = rig.attach_controller(blender.humidity, chamber_h, law=P(kp=1.0))
         controller.regulate(50.0, transfer=Transfer.RESET)
         assert len(dry.calls) == 1, "arming the controller writes once, outside a delivery"
 
@@ -161,7 +218,7 @@ class TestRail:
         states = rig.demand(
             blender.root, {"humidity": 200.0}
         )  # clamped to 100 by `limits`, still outside 10-90
-        assert states[blender.signals["humidity"]].at_limit == "high"
+        assert states[blender.humidity].at_limit == "high"
 
     def test_calculate_wet_fraction_rails_and_raises_on_a_bad_span(self) -> None:
         humidities = SupplyHumidities(dry=10.0, wet=90.0)
@@ -173,12 +230,13 @@ class TestRail:
 
 
 def test_stop_is_a_command_not_a_demand(
-    blender: DualPumpBlender, pumps: tuple[DualPumps, RecordingPump, RecordingPump]
+    rig: Any, blender: DualPumpBlender, pumps: tuple[DualPumps, RecordingPump, RecordingPump]
 ) -> None:
     _, dry, wet = pumps
     assert "stop" in blender.commands
-    blender.stop()
+    rig.run_command(blender, "stop")
     assert dry.effort == pytest.approx(0.0) and wet.effort == pytest.approx(0.0)
+    assert blender.dry_flow.value == pytest.approx(0.0) and blender.mode.value is Mode.STOPPED
 
 
 class TestPwmPump:
@@ -214,8 +272,6 @@ def test_the_config_builds_a_working_blender_on_a_fake_pwm_chip(fresh: Any) -> N
         supply=SupplyConfig(dry=10.0, wet=90.0),
     )
     device = config.model_copy(update={"link": chip}).build(fresh("blender"))
-    device.apply(device.signals["dry_flow"], 0, 0.4)
-    device.apply(device.signals["wet_flow"], 0, 0.6)
-    device.commit(0)
+    device.set_flows(0.4, 0.6)
     assert chip.channels.keys() == {0, 1}
     assert chip.enabled == {0: True, 1: True}

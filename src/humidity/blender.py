@@ -1,29 +1,36 @@
 """The dual-pump blender: a composite actuator that mixes a dry and a wet line to a target %RH.
 
-`DualPumpBlender.commit` does the split-range arithmetic once per delivery
-(`calculate_wet_fraction`), however many of a new target, a changed supply
-reading and a new blend flow arrived together -- one pump write. A demand on
-`dry_flow`/`wet_flow` or `dry_effort`/`wet_effort` instead drives the lines
-directly, bypassing the arithmetic; `stop` is a command, not a demand.
+A controller drives `humidity`; people run the commands. `set_flows`,
+`set_efforts` and `stop` drive the lines directly and put the blender in
+that mode; a humidity demand puts it back in BLEND, where `commit` does the
+split-range arithmetic once per delivery. `mode` says which is in force.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
 from enum import Enum
-from typing import Literal
 
-from flyball.core.device import Device, DeviceSettings, DriverConfig, command
+from flyball.core.device import (
+    Committable,
+    Demand,
+    DriverConfig,
+    For,
+    Namespace,
+    Output,
+    Setting,
+    command,
+)
 from flyball.core.errors import UnachievableError
-from flyball.core.signal import Access, Node, Reading, Sample, Signal, SignalSpec, WriteState
+from flyball.core.signal import Section
 from flyball.core.typing import Normalised, Positive
+from flyball.core.utils import Labelled
 from flyball_linux.links.pwm import PwmLinkConfig
 from pydantic import BaseModel, ConfigDict
 
 from humidity.pumps import (
     Absolute,
     BlendFlow,
+    DefaultBlendFlow,
     DefaultHumidities,
     DualPumps,
     MaxFlows,
@@ -38,12 +45,6 @@ from humidity.units import EFFORT, FLOW, HUMIDITY, Humidity
 
 
 class BlenderError(Exception): ...
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class BlenderSettings(DeviceSettings):
-    blend: BlendFlow
-    """How much air the blend moves: absolute, of the blend's or of the guaranteed maximum."""
 
 
 class HumidityRailError(BlenderError, UnachievableError):
@@ -87,15 +88,56 @@ def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Norma
     return (target - humidities.dry) / humidities.difference
 
 
-class DualPumpBlender(Device):
+class Mode(Labelled):
+    """What is driving the pumps: the last command, or a humidity demand."""
+
+    BLEND = "blend", "Blending to a target humidity"
+    FLOWS = "flows", "Flows set directly"
+    EFFORTS = "efforts", "Efforts set directly"
+    STOPPED = "stopped", "Stopped"
+
+
+DRY = Section("dry", "Dry line")
+WET = Section("wet", "Wet line")
+
+
+class DualPumpBlender(Committable):
     """Two pumps, blended to a target %RH; also settable directly by flow or by effort.
 
-    Signals: `humidity [W]` the split-range target, limits 0-100; `dry_flow`
-    / `wet_flow [RPW]` together, litres/min; `dry_effort` / `wet_effort
-    [RPW]` together, 0-1 of full; `blend_flow [RW]` the total flow a
-    humidity demand mixes to, a setting; `expected_humidity [RP]` what the
-    lines actually deliver. `bound` follows the supply lines' humidity.
+    A demand on `humidity` puts the blender in BLEND: `commit` does the
+    split-range arithmetic once per delivery (`calculate_wet_fraction`),
+    however many of a new target, a changed supply reading and a new blend
+    flow arrived together -- one pump write. `set_flows`, `set_efforts` and
+    `stop` drive the lines at once and change the mode, so a supply reading
+    re-blends only while blending. The flows and efforts are demands whose
+    readbacks follow whatever is driving the pumps.
     """
+
+    flows = Namespace("flows", "Flows")
+    efforts = Namespace("efforts", "Efforts")
+    max_flows = Namespace("max_flows", "Max flows")
+    supply = Namespace("supply", "Supply humidities")
+    supply_defaults = Namespace("supply_defaults", "Supply humidities when unbound")
+
+    dry_max_flow = max_flows.config(DRY, "Dry max flow", FLOW)
+    wet_max_flow = max_flows.config(WET, "Wet max flow", FLOW)
+    dry_supply_default = supply_defaults.config(DRY, "Dry line humidity", HUMIDITY)
+    wet_supply_default = supply_defaults.config(WET, "Wet line humidity", HUMIDITY)
+
+    dry_supply = supply.input(DRY, "Dry line humidity", HUMIDITY, default=dry_supply_default)
+    wet_supply = supply.input(WET, "Wet line humidity", HUMIDITY, default=wet_supply_default)
+
+    humidity = Demand("humidity", "Target humidity", HUMIDITY, limits=(0.0, 100.0))
+    dry_flow = flows.demand(DRY, "Dry pump flow", FLOW, limits=(0.0, dry_max_flow))
+    wet_flow = flows.demand(WET, "Wet pump flow", FLOW, limits=(0.0, wet_max_flow))
+    dry_effort = efforts.demand(DRY, "Dry pump effort", EFFORT, limits=(0.0, 1.0))
+    wet_effort = efforts.demand(WET, "Wet pump effort", EFFORT, limits=(0.0, 1.0))
+
+    expected_humidity = Output(
+        "expected_humidity", "Expected humidity", HUMIDITY, range=(0.0, 100.0), precision=1
+    )
+    mode = Output("mode", "Mode", vtype=Mode, initial=Mode.BLEND)
+    blend = Setting("blend", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
 
     def __init__(
         self,
@@ -107,142 +149,76 @@ class DualPumpBlender(Device):
         label: str | None = None,
     ) -> None:
         super().__init__(name, label)
-        self.bind((
-            SignalSpec(name="humidity", quantity=HUMIDITY, access=Access.W, limits=(0.0, 100.0)),
-            SignalSpec(
-                name="dry_flow",
-                quantity=FLOW,
-                access=Access.RPW,
-                limits=(0.0, pumps.dry_max_flow),
-                together=frozenset({"wet_flow"}),
-            ),
-            SignalSpec(
-                name="wet_flow",
-                quantity=FLOW,
-                access=Access.RPW,
-                limits=(0.0, pumps.wet_max_flow),
-                together=frozenset({"dry_flow"}),
-            ),
-            SignalSpec(
-                name="dry_effort",
-                quantity=EFFORT,
-                access=Access.RPW,
-                limits=(0.0, 1.0),
-                together=frozenset({"wet_effort"}),
-            ),
-            SignalSpec(
-                name="wet_effort",
-                quantity=EFFORT,
-                access=Access.RPW,
-                limits=(0.0, 1.0),
-                together=frozenset({"dry_effort"}),
-            ),
-            SignalSpec(name="blend_flow", quantity=FLOW, access=Access.RW),
-            SignalSpec(
-                name="expected_humidity",
-                quantity=HUMIDITY,
-                access=Access.RP,
-                range=(0.0, 100.0),
-                precision=1,
-            ),
-        ))
         self._pumps = pumps
-        self._supply = supply
         self._target = (supply.dry + supply.wet) / 2.0
-        self._blend: BlendFlow = Absolute(blend_flow, OnOverdrive.CLAMP)
-        self._rail: Literal["low", "high"] | None = None
-        self._expected_humidity = expected_humidity_from_flows(pumps.flows, supply)
+        self.dry_max_flow.push(pumps.dry_max_flow)
+        self.wet_max_flow.push(pumps.wet_max_flow)
+        self.dry_supply_default.push(supply.dry)
+        self.wet_supply_default.push(supply.wet)
+        self.blend.push(Absolute(blend_flow, OnOverdrive.CLAMP))
 
     @property
-    def settings(self) -> BlenderSettings:
-        return BlenderSettings(blend=self._blend)
+    def _supply(self) -> SupplyHumidities:
+        """The supply lines' humidity now: the bound sensors', or the config's."""
+        return SupplyHumidities(dry=self.dry_supply.value, wet=self.wet_supply.value)
 
-    @property
-    def _blend_flow(self) -> float:
-        """The total flow the pumps put out: the `blend_flow` readback, honest in every mode."""
-        flows = self._pumps.flows
-        return flows.dry + flows.wet
+    def commit(self, time_ns: int) -> None:
+        """A humidity demand starts blending; while blending, a moved supply re-blends."""
+        if (target := self.humidity.pending) is not None:
+            self._target = target
+            if self.mode.value is not Mode.BLEND:
+                self.mode.push(Mode.BLEND, time_ns)
+        if self.mode.value is Mode.BLEND:
+            self._blend_pumps(time_ns)
 
-    def observe(self, event: Reading | Sample) -> None:
-        """A bound supply line published a new humidity: record it, ready for the next `commit`."""
-        if not isinstance(event, Reading):
-            return  # bound only to leaf signals (dry/wet humidity); a Sample cannot arrive here
-        for role, signal in self.bound.items():
-            if event.signal is signal:
-                self._supply = SupplyHumidities(
-                    dry=event.value if role == "dry" else self._supply.dry,
-                    wet=event.value if role == "wet" else self._supply.wet,
-                )
-
-    def commit(self, time_ns: int) -> Mapping[Signal, WriteState]:
-        pending = self.pending
-        dry_flow, wet_flow = self.signals["dry_flow"], self.signals["wet_flow"]
-        dry_effort, wet_effort = self.signals["dry_effort"], self.signals["wet_effort"]
-        humidity, blend_flow = self.signals["humidity"], self.signals["blend_flow"]
-        self._rail = None
-        if dry_flow in pending or wet_flow in pending:
-            self._pumps.set_flows(SupplyFlows(pending[dry_flow], pending[wet_flow]))
-        elif dry_effort in pending or wet_effort in pending:
-            self._pumps.set_efforts(SupplyEfforts(pending[dry_effort], pending[wet_effort]))
-        else:
-            self._target = pending.get(humidity, self._target)
-            if blend_flow in pending:  # a plain number: an absolute flow, clamped to the lines
-                self._blend = Absolute(pending[blend_flow], OnOverdrive.CLAMP)
-            self._blend_pumps()
-        self._expected_humidity = expected_humidity_from_flows(self._pumps.flows, self._supply)
-        states: dict[Signal, WriteState] = {}
-        rail = self._rail
-        for signal, value in pending.items():
-            states[signal] = (
-                WriteState(value=value, at_limit=rail)
-                if signal is humidity and rail is not None
-                else signal.write_state(value)
-            )
-        self.written.update(states)
-        pending.clear()
-        return states
-
-    def _blend_pumps(self) -> None:
-        """Put the blend on the pumps: the wet fraction for the target, the flow `_blend` says."""
+    def _blend_pumps(self, time_ns: int | None = None) -> None:
+        """Put the blend on the pumps: the wet fraction for the target, the flow `blend` says."""
         fraction = calculate_wet_fraction(self._supply, self._target)
-        self._rail = (
+        self.humidity.at_limit = (
             ("low" if fraction is Rail.DRY else "high") if isinstance(fraction, Rail) else None
         )
-        self._pumps.set_blend(self._blend, float(fraction))
+        self._pumps.set_blend(self.blend.value, float(fraction))
+        self._push_readbacks(time_ns)
+
+    def _push_readbacks(self, time_ns: int | None = None) -> None:
+        """What the pumps are now doing, on the flow and effort demands, and what it delivers."""
+        output = self._pumps.output
+        self.dry_flow.push(output.flows.dry, time_ns)
+        self.wet_flow.push(output.flows.wet, time_ns)
+        self.dry_effort.push(output.efforts.dry, time_ns)
+        self.wet_effort.push(output.efforts.wet, time_ns)
+        expected = expected_humidity_from_flows(output.flows, self._supply)
+        self.expected_humidity.push(0.0 if expected is None else expected, time_ns)
 
     @command
-    def set_blend(self, flow: BlendFlow) -> BlenderSettings:
+    def set_blend(self, flow: BlendFlow) -> None:
         """Choose how much air the blend moves.
 
         An absolute flow (and what to do if the lines cannot give it), a
         fraction of the most the blend can move at this mix, or a fraction of
         the flow guaranteed at every mix. Takes effect at once when blending.
         """
-        self._blend = flow
-        self._blend_pumps()
-        self._expected_humidity = expected_humidity_from_flows(self._pumps.flows, self._supply)
-        return self.settings
+        self.blend.push(flow)
+        if self.mode.value is Mode.BLEND:
+            self._blend_pumps()
 
-    def read(self, time_ns: int, node: Node | None = None) -> Iterator[Sample]:
-        """The setting and every readback, computed from the pumps -- no bus I/O."""
-        output = self._pumps.output
-        yield Sample(
-            self.root,
-            time_ns,
-            {
-                self.signals["dry_flow"]: output.flows.dry,
-                self.signals["wet_flow"]: output.flows.wet,
-                self.signals["dry_effort"]: output.efforts.dry,
-                self.signals["wet_effort"]: output.efforts.wet,
-                self.signals["blend_flow"]: self._blend_flow,
-                self.signals["expected_humidity"]: self._expected_humidity or 0.0,
-            },
-        )
+    @command(mode=Mode.FLOWS)
+    def set_flows(self, dry: For[dry_flow], wet: For[wet_flow]) -> None:
+        """Drive each line at a flow. A line left out keeps its current flow."""
+        self._pumps.set_flows(SupplyFlows(dry, wet))
+        self._push_readbacks()
 
-    @command
+    @command(mode=Mode.EFFORTS)
+    def set_efforts(self, dry: For[dry_effort], wet: For[wet_effort]) -> None:
+        """Drive each line at an effort, 0-1 of full. A line left out keeps its current effort."""
+        self._pumps.set_efforts(SupplyEfforts(dry, wet))
+        self._push_readbacks()
+
+    @command(mode=Mode.STOPPED, owner_exempt=True)
     def stop(self) -> None:
-        """Stop both pumps at once, bypassing any pending demand."""
+        """Stop both pumps at once, whatever is driving them."""
         self._pumps.stop()
+        self._push_readbacks()
 
 
 class PumpLineConfig(BaseModel):

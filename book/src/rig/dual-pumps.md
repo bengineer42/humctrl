@@ -3,27 +3,32 @@
 *How a demand becomes two pump flows: blend policy, supply humidities, limits.*
 
 `DualPumpBlender` (`examples/humidity/src/humidity/blender.py`, driver tag
-`dual_pump_blender`) is a composite device: it does its split-range
-arithmetic once per delivery in `commit`, however many of a new target, a
-changed supply reading and a new blend flow arrived together — one pump
-write per delivery, not one per input.
+`dual_pump_blender`) is a composite device: a controller drives its
+`humidity` demand, and `commit` does the split-range arithmetic once per
+delivery, however many of a new target, a changed supply reading and a
+new blend flow arrived together — one pump write per delivery, not one
+per input. People run its commands, which drive the lines at once.
 
 ## The signals, and what drives them
 
-| signal | access | drives |
+| signal | role | what it is |
 | --- | --- | --- |
-| `humidity` | `[W]` | the split-range target; a controller usually owns this |
-| `dry_flow`, `wet_flow` | `[RPW]`, `together` | manual flow, L/min; bypasses the arithmetic |
-| `dry_effort`, `wet_effort` | `[RPW]`, `together` | manual effort, 0–1 of full; bypasses the arithmetic |
-| `blend_flow` | `[RW]` | a setting: the total flow a `humidity` demand mixes to |
-| `expected_humidity` | `[RP]` | what the current pump outputs should actually deliver |
+| `humidity` | demand | the split-range target; a controller usually owns this |
+| `flows.dry`, `flows.wet` | demand | each line's flow, L/min: the readback, set by `set_flows` |
+| `efforts.dry`, `efforts.wet` | demand | each line's effort, 0–1 of full: the readback, set by `set_efforts` |
+| `expected_humidity` | output | what the current pump outputs should actually deliver |
+| `mode` | output | `blend`, `flows`, `efforts` or `stopped`: what is driving the pumps |
+| `blend` | setting | the flow a `humidity` demand mixes to; `set_blend` |
+| `max_flows.dry`, `max_flows.wet` | config | each line's maximum, the limit of its flow demand |
 
-`commit` picks one of three things to do with whatever arrived in the
-delivery, in this order: a `dry_flow`/`wet_flow` pair wins over a
-`dry_effort`/`wet_effort` pair, which wins over a `humidity` (or
-`blend_flow`) demand — so a manual flow always overrides the split-range
-target for that delivery. `read` never touches the bus: it reports the
-setting and every readback computed from the pumps' own state.
+The mode decides what a delivery does. A `humidity` demand puts the
+blender in `blend`, where a moved supply reading re-blends; `set_flows`,
+`set_efforts` and `stop` drive the lines at once and change the mode, so
+a manual flow is not undone by the next supply reading. The `dry`/`wet`
+sections tag each line's signals across `flows`, `efforts` and
+`max_flows`, so a UI can show the tree by line as well as by kind. The
+blender is never polled: it pushes its readbacks from `commit` and from
+its commands.
 
 ## The split-range arithmetic
 
@@ -42,11 +47,11 @@ def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Norma
 ```
 
 A target outside `[dry, wet]` doesn't raise — it rails to the nearer end,
-and the delivery's `WriteState` for `humidity` reports `at_limit: "low"` or
+and the delivery's write state for `humidity` reports `at_limit: "low"` or
 `"high"`. Only a wet-humidity-not-greater-than-dry configuration raises
 (`SupplyHumiditiesError`): with no span there is nothing to blend.
 
-The fraction, `blend_flow` (the setting) and `pumps.set_blend(...)` then
+The fraction, `blend` (the setting) and `pumps.set_blend(...)` then
 give the actual dry/wet flows, which each line's `PwmPump.set_effort`
 turns into a PWM duty ratio (`calculate_duty_ratio`, honouring that line's
 `deadband`) and writes straight to `flyball-linux`'s `PwmLink` protocol —
@@ -61,12 +66,15 @@ device each: the split-range maths is its own, so one PWM chip link
 bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 ```
 
-`blender.observe` is called whenever a bound signal publishes: it records
-the new supply humidity but does no I/O. The next `commit` — triggered by
-*any* delivery that touches this device, not necessarily the one that
-carried the new supply reading — picks it up. `expected_humidity` is
-recomputed every `commit` from the pumps' actual output and the current
-supply humidities, so it reflects reality even between controller moves.
+The blender declares two inputs, `dry` and `wet` (`supply.input(...)` in
+the class body); the rig file binds them to the sensors. Whenever a bound
+signal publishes, the rig commits the blender, and `commit` reads the
+supply's newest values from the router (`self.dry_supply.value`) — there
+is no callback and no copy on the device. While blending, that re-blends;
+in any other mode it does nothing. A rig with no sensor bound uses
+`config.supply` (the `supply_defaults` config signals) instead.
+`expected_humidity` is pushed after every pump write from the pumps'
+actual output and the current supply humidities.
 
 ## Limits
 
@@ -74,12 +82,14 @@ supply humidities, so it reflects reality even between controller moves.
   railed against the two supplies as above — so a demand can be within
   `[0, 100]` and still rail if it's outside what the current dry/wet
   supply can reach.
-- `dry_flow`/`wet_flow` are each limited to their pump's `max_flow`
-  (`rig.yaml`: 2.0 L/min per line).
-- `dry_effort`/`wet_effort` are limited to `[0, 1]`.
-- `stop` (a command, not a demand: `blender.stop()`, or `POST
-  /api/devices/blender/commands/stop`) stops both pumps at once, bypassing whatever
-  is pending.
+- `flows.dry`/`flows.wet` are each limited to their pump's `max_flow`
+  (`rig.yaml`: 2.0 L/min per line) — the limit *is* the `max_flows.dry`
+  config signal, so the command form shows it and the rig clamps to it.
+- `efforts.dry`/`efforts.wet` are limited to `[0, 1]`.
+- `set_flows` and `set_efforts` take one value per line; a line left out
+  keeps its current value. They are refused while a controller drives
+  `humidity` (put it in manual, or detach it); `stop` is exempt and stops
+  both pumps at once, whatever is driving them.
 
 ## Config
 
@@ -87,7 +97,6 @@ supply humidities, so it reflects reality even between controller moves.
 blender:
   driver: dual_pump_blender
   label: Pump blender
-  poll_s: 1
   config:
     link: pwm0
     dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min

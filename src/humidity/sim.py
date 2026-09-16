@@ -14,10 +14,10 @@ value by `sensor_tau_s`. It is two things at once:
   hardware PWM chip, channel 0 the dry line and channel 1 the wet line,
   matching `rig.yaml`'s `dry.channel`/`wet.channel`. So `sim.yaml`'s
   `blender` device is the genuine `DualPumpBlender` -- every signal, unit,
-  access and command (`stop`) matches the real rig exactly, because it is
-  the same class; `expected_humidity`, `dry_flow`/`wet_flow` and
-  `dry_effort`/`wet_effort` are the blender's own bookkeeping, not read
-  back from the chamber, precisely as on the real rig (plan §1.6).
+  role and command matches the real rig exactly, because it is the same
+  class; `expected_humidity`, `flows.*`, `efforts.*` and `mode` are the
+  blender's own bookkeeping, not read back from the chamber, precisely as
+  on the real rig (plan §1.6).
 
 The dry and wet supplies drift slowly (a sinusoid, decorrelated by phase)
 and carry their own reading noise, so the "Inputs" page is not a flat

@@ -82,7 +82,7 @@ def flatten(value: dict[str, Any], prefix: str = "") -> str:
 
 
 def parse_values(pairs: list[str]) -> dict[str, float]:
-    """`["dry_flow=0.4", "wet_flow=0.6"]` -> `{"dry_flow": 0.4, "wet_flow": 0.6}`."""
+    """`["flows.dry=0.4", "flows.wet=0.6"]` -> `{"flows.dry": 0.4, "flows.wet": 0.6}`."""
     values: dict[str, float] = {}
     for pair in pairs:
         name, sep, raw = pair.partition("=")
