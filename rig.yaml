@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=rig.schema.json
+# Split-range humidity control: two PWM pumps blend a dry and a wet air
+# supply to a target %RH in the chamber. Three SHT4x sensors (the chamber,
+# and each supply line) on one I²C bus; the chamber's controller drives the
+# blender's `humidity` target, which the blender turns into a wet fraction
+# of the pumps' shared flow (`temp-docs/DEVICE-MODEL-PLAN.md` §2).
+#
+#   flyball-daemon rig.yaml                 # real hardware
+#   flyball-daemon rig.yaml sim.yaml        # the same addresses, no hardware (see sim.yaml)
+
+name: humidity
+
+links:
+  i2c1: { tag: i2c, bus: 1 }
+  pwm0: { tag: linux_pwm, chip: 0 }
+
+devices:
+  hum_sensors:                             # hum_sensors.chamber/dry/wet .humidity/.temperature [RP]
+    driver: sht4x_set
+    label: Humidity sensors
+    poll_s: 1
+    config:
+      link: i2c1
+      sensors:
+        chamber: { address: 0x44 }
+        dry: { address: 0x45 }
+        wet: { address: 0x46 }
+    signals:
+      chamber: { signals: { humidity: { warn: [20, 80] } } }
+      dry: { poll_s: 5 }     # the supply lines drift slowly; no need to poll them as often
+      wet: { poll_s: 5 }
+
+  blender:                                 # two pumps blended into one settable humidity
+    driver: dual_pump_blender
+    label: Pump blender
+    poll_s: 1
+    config:
+      link: pwm0
+      dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
+      wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
+      blend_flow: 1.0
+    bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
+    # signals the driver declares:
+    #   humidity                [W]    %RH, limits [0, 100]   the split-range target
+    #   dry_flow, wet_flow      [RPW]  L/min, together        manual flows; also the readback
+    #   dry_effort, wet_effort  [RPW]  0-1 of full, together  manual efforts; also the readback
+    #   blend_flow               [RW]  L/min                  a setting: read on demand, not streamed
+    #   expected_humidity        [RP]  %RH                    what the lines actually deliver
+
+controllers:
+  blender.humidity:
+    signal: hum_sensors.chamber.humidity
+    law: { tag: PI, kp: 0.8, ki: 0.02, tt: 60 }
+    default: true

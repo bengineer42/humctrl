@@ -1,375 +1,122 @@
-"""A humidity rig with no hardware.
+"""A humidity chamber, as a [MultiPlant][flyball.sim.furnace.MultiPlant] link: no hardware needed.
 
-Two pumps that remember their effort, a chamber whose humidity chases their
-blend, and one SHT4x-shaped sensor:
-
-    python -m humidity.sim            # serve on :8000, recording to sim.db
+One input, `wet_fraction` (0 dry to 1 wet of the blend); six named
+outputs, one per leaf of the real `hum_sensors` device --
+`chamber_humidity`, `chamber_temperature`, `dry_humidity`,
+`dry_temperature`, `wet_humidity`, `wet_temperature` -- so `sim.yaml` can
+read and drive it under the exact addresses `rig.yaml` declares (plan
+§1.6). The chamber humidity settles towards the blend on a first-order lag
+(`Lag`, reused from [flyball.sim.plant]); the supply lines and every
+temperature are constants -- nothing here models a thermal path.
 """
 
 from __future__ import annotations
 
-import argparse
-import logging
 import random
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+from typing import Literal
 
-from flyball.core.clock import Clock
-from flyball.core.device import Device, DeviceSettings, DeviceState, command
-from flyball.core.typing import NonNegative, Normalised, Percent, Positive
-from flyball.runtime.rig import Rig
-from flyball.runtime.simulation import Simulation
-from flyball.sim import FunctionReader, Lag, ScaledClock
+from flyball.core.config import Config
+from flyball.core.typing import NonNegative, Positive
+from flyball.sim.plant import Lag
 
-from humidity.blender import DualPumpsBlender, expected_humidity_from_flows
-from humidity.pumps import DualPumps, PumpPair
-from humidity.pumps.drivers import PumpDriver
-from humidity.pumps.types import MaxFlows, SupplyHumidities
-from humidity.readers import HTSource, Humidity, Temperature
+from humidity.blender import SupplyHumiditiesError
+from humidity.pumps import SupplyHumidities
+from humidity.units import Humidity, Temperature
 
-log = logging.getLogger("humidity.sim")
-
-
-class SimPump(PumpDriver):
-    """A pump that only remembers what it was told."""
-
-    def __init__(self) -> None:
-        self._effort: Normalised = 0.0
-
-    @property
-    def effort(self) -> Normalised:
-        return self._effort
-
-    def set_effort(self, effort: Normalised) -> Normalised:
-        self._effort = effort
-        return effort
-
-    def stop(self) -> None:
-        self._effort = 0.0
+Port = Literal[
+    "chamber_humidity",
+    "chamber_temperature",
+    "dry_humidity",
+    "dry_temperature",
+    "wet_humidity",
+    "wet_temperature",
+]
+PORTS: tuple[Port, ...] = (
+    "chamber_humidity",
+    "chamber_temperature",
+    "dry_humidity",
+    "dry_temperature",
+    "wet_humidity",
+    "wet_temperature",
+)
 
 
-class Chamber:
-    """Humidity chases the pumps' blend; with no flow it drifts to ambient.
-
-    A first-order lag whose time constant shrinks as flow rises.
-    """
+class HumidityChamber:
+    """A `MultiPlant`: `wet_fraction` in, the chamber's and both supplies' RH and T out."""
 
     def __init__(
         self,
-        pumps: DualPumps,
-        supply: SupplyHumidities,
-        clock: Clock,
-        ambient: Percent = 40.0,
-        tau_s: Positive = 60.0,
-        temperature: float = 21.0,
-        noise_rh: float = 0.3,
-        noise_c: float = 0.05,
-        seed: int | None = None,
+        dry: float,
+        wet: float,
+        tau_s: float,
+        initial: float,
+        temperature: float,
+        noise: float,
+        seed: int | None,
     ) -> None:
-        self._pumps = pumps
-        self._supply = supply
-        self._clock = clock
-        self._ambient = ambient
-        self._tau_s = tau_s
+        self.inputs: dict[str, float] = {"wet_fraction": 0.0}
+        self.output_names = PORTS
+        self._dry = dry
+        self._wet = wet
         self._temperature = temperature
-        self._lag = Lag(tau_s, value=ambient)
-        self._last_ns = clock.now_ns()
-        # Sensor noise, one sigma: the SHT45 datasheet gives ±1 %RH / ±0.1 °C
-        # accuracy, and repeatability is a few tenths of that.
-        self._noise_rh = noise_rh
-        self._noise_c = noise_c
+        self._lag = Lag(tau_s, initial, gain=wet - dry, ambient=dry)
+        self._last_ns: int | None = None
+        self._noise = noise
         self._random = random.Random(seed)
 
-    # region Knobs: what a simulation panel turns
+    def output(self, port: str) -> float:
+        if port == "chamber_humidity":
+            return min(100.0, max(0.0, self._random.gauss(self._lag.value, self._noise)))
+        if port == "dry_humidity":
+            return self._dry
+        if port == "wet_humidity":
+            return self._wet
+        if port in ("chamber_temperature", "dry_temperature", "wet_temperature"):
+            return self._temperature
+        raise ValueError(f"no output {port!r}; there are {self.output_names}")
 
-    @property
-    def tau_s(self) -> Positive:
-        """The idle time constant; with flow it shrinks (see `sample`)."""
-        return self._tau_s
-
-    @tau_s.setter
-    def tau_s(self, tau_s: Positive) -> None:
-        if tau_s <= 0:
-            raise ValueError("tau_s must be positive")
-        self._tau_s = tau_s
-
-    @property
-    def ambient(self) -> Percent:
-        return self._ambient
-
-    @ambient.setter
-    def ambient(self, ambient: Percent) -> None:
-        self._ambient = ambient
-
-    @property
-    def noise(self) -> tuple[NonNegative, NonNegative]:
-        """One sigma of the sensor's noise: (%RH, °C)."""
-        return self._noise_rh, self._noise_c
-
-    def set_noise(self, rh: NonNegative | None = None, c: NonNegative | None = None) -> None:
-        if rh is not None:
-            self._noise_rh = rh
-        if c is not None:
-            self._noise_c = c
-
-    @property
-    def humidity(self) -> Percent:
-        """What the chamber is actually at, before the sensor's noise."""
-        return self._lag.value
-
-    @property
-    def target(self) -> Percent | None:
-        """What the humidity is chasing now: the blend, or ambient with no flow."""
-        return expected_humidity_from_flows(self._pumps.flows, self._supply)
-
-    @property
-    def effective_tau_s(self) -> Positive:
-        return self._lag.tau_s
-
-    def reset(self, humidity: Percent | None = None) -> None:
-        """Put the chamber at `humidity` (default ambient) now, as if the door had been opened."""
-        self._lag.value = self._ambient if humidity is None else humidity
-        self._last_ns = self._clock.now_ns()
-
-    # endregion
-
-    def sample(self, time_ns: int) -> dict[Any, float]:
-        flows = self._pumps.flows
-        expected = expected_humidity_from_flows(flows, self._supply)
-        # Time constant falls with flow: at guaranteed max flow it is a tenth of the idle one.
-        fraction = min(flows.total / self._pumps.guaranteed_max_flow, 1.0)
-        self._lag.tau_s = self._tau_s / (1.0 + 9.0 * fraction)
-        dt_s = max(time_ns - self._last_ns, 0) / 1e9
+    def advance(self, time_ns: int) -> None:
+        """Step the lag to `time_ns`; a second call at the same instant does nothing."""
+        if self._last_ns is not None and time_ns > self._last_ns:
+            self._lag.input = self.inputs["wet_fraction"]
+            self._lag.step((time_ns - self._last_ns) / 1e9)
         self._last_ns = time_ns
-        humidity = self._lag.drive(self._ambient if expected is None else expected, dt_s)
-        return {
-            Humidity: min(100.0, max(0.0, self._random.gauss(humidity, self._noise_rh))),
-            Temperature: self._random.gauss(self._temperature, self._noise_c),
-        }
+
+    def feedforward(self, port: str, demand: float) -> float:
+        self._check_input(port)
+        return self._lag.feedforward(demand)
+
+    def inverse_feedforward(self, port: str, drive: float) -> float:
+        self._check_input(port)
+        return self._lag.inverse_feedforward(drive)
+
+    def _check_input(self, port: str) -> None:
+        if port not in self.inputs:
+            raise ValueError(f"no input {port!r}; there are {tuple(self.inputs)}")
 
 
-class Supplies:
-    """The two supply lines: steady at their nominal humidity, plus sensor noise."""
+class HumidityChamberConfig(Config[HumidityChamber], tag="sim_humidity_chamber"):
+    """A chamber that settles towards the blend's expected humidity.
 
-    def __init__(
-        self,
-        nominal: tuple[Percent, Percent],
-        temperature: float = 21.0,
-        noise_rh: float = 0.3,
-        noise_c: float = 0.05,
-        seed: int | None = None,
-    ) -> None:
-        self._dry, self._wet = nominal
-        self._temperature = temperature
-        self._noise_rh = noise_rh
-        self._noise_c = noise_c
-        self._random = random.Random(seed)
+    At `wet_fraction` 0 (all dry) it rests at `dry`; at 1 (all wet) at
+    `wet`; a fraction in between at the point along that span. The supply
+    lines and every temperature are steady -- there is no thermal model to
+    perturb them.
+    """
 
-    @property
-    def nominal(self) -> tuple[Percent, Percent]:
-        """(dry, wet): what each line carries."""
-        return self._dry, self._wet
-
-    def set_nominal(self, dry: Percent | None = None, wet: Percent | None = None) -> None:
-        if dry is not None:
-            self._dry = dry
-        if wet is not None:
-            self._wet = wet
-
-    def set_noise(self, rh: NonNegative | None = None, c: NonNegative | None = None) -> None:
-        if rh is not None:
-            self._noise_rh = rh
-        if c is not None:
-            self._noise_c = c
-
-    def _read(self, humidity: Percent) -> dict[Any, float]:
-        return {
-            Humidity: min(100.0, max(0.0, self._random.gauss(humidity, self._noise_rh))),
-            Temperature: self._random.gauss(self._temperature, self._noise_c),
-        }
-
-    def dry(self, time_ns: int) -> dict[Any, float]:
-        return self._read(self._dry)
-
-    def wet(self, time_ns: int) -> dict[Any, float]:
-        return self._read(self._wet)
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class HumiditySimulationSettings(DeviceSettings):
+    dry: Humidity = 10.0
+    wet: Humidity = 90.0
     tau_s: Positive = 60.0
-    """The chamber's idle time constant, s; it shrinks as flow rises."""
-    ambient: Percent = 40.0
-    """Where the chamber drifts with no flow, %RH."""
-    noise_rh: NonNegative = 0.3
-    """Sensor noise, one sigma, %RH; every SHT4x-shaped source."""
-    noise_c: NonNegative = 0.05
-    """Sensor noise, one sigma, °C."""
-    supply: tuple[Percent, Percent] = (10.0, 90.0)
-    """What the (dry, wet) lines carry, %RH."""
+    initial: Humidity = 40.0
+    temperature: Temperature = 21.0
+    noise: NonNegative = 0.3
+    """Gaussian noise on the chamber's humidity reading, %RH."""
+    seed: int | None = None
 
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class HumiditySimulationState(DeviceState):
-    humidity: Percent
-    """The chamber's true humidity, before the sensor's noise."""
-    target: Percent | None
-    """What it is chasing: the pumps' blend, or ambient with no flow."""
-    effective_tau_s: Positive
-    """The time constant at the current flow."""
-    speed: float
-    """Rig seconds per wall second; `PUT /api/sim/clock` changes it, `/api/sim` has the clock."""
-
-
-class HumiditySimulation(Device):
-    """What exists only because the chamber is simulated: its physics and its sensors' noise.
-
-    The rig's speed lives on `/api/sim` with every other simulation's; this
-    device carries what a rig file cannot name. Served at `/api/sim/device`.
-    """
-
-    def __init__(
-        self, rig: Rig, chamber: Chamber, supplies: Supplies, name: str = "simulation"
-    ) -> None:
-        super().__init__(name)
-        self.rig = rig
-        self.chamber = chamber
-        self.supplies = supplies
-
-    @property
-    def settings(self) -> HumiditySimulationSettings:
-        noise_rh, noise_c = self.chamber.noise
-        return HumiditySimulationSettings(
-            tau_s=self.chamber.tau_s,
-            ambient=self.chamber.ambient,
-            noise_rh=noise_rh,
-            noise_c=noise_c,
-            supply=self.supplies.nominal,
+    def build(self) -> HumidityChamber:
+        humidities = SupplyHumidities(self.dry, self.wet)
+        if humidities.wet <= humidities.dry:
+            raise SupplyHumiditiesError(humidities)
+        return HumidityChamber(
+            self.dry, self.wet, self.tau_s, self.initial, self.temperature, self.noise, self.seed
         )
-
-    @property
-    def state(self) -> HumiditySimulationState:
-        return HumiditySimulationState(
-            humidity=self.chamber.humidity,
-            target=self.chamber.target,
-            effective_tau_s=self.chamber.effective_tau_s,
-            speed=float(getattr(self.rig.clock, "speed", 1.0)),
-        )
-
-    @command
-    def set_chamber(
-        self, tau_s: Positive | None = None, ambient: Percent | None = None
-    ) -> HumiditySimulationSettings:
-        """Change the chamber's physics: its idle time constant and where it rests with no flow."""
-        if tau_s is not None:
-            self.chamber.tau_s = tau_s
-        if ambient is not None:
-            self.chamber.ambient = ambient
-        return self.settings
-
-    @command
-    def set_noise(
-        self, rh: NonNegative | None = None, c: NonNegative | None = None
-    ) -> HumiditySimulationSettings:
-        """Sensor noise, one sigma, on every source: humidity in %RH, temperature in °C."""
-        self.chamber.set_noise(rh, c)
-        self.supplies.set_noise(rh, c)
-        return self.settings
-
-    @command
-    def set_supply(
-        self, dry: Percent | None = None, wet: Percent | None = None
-    ) -> HumiditySimulationSettings:
-        """What the supply lines carry; the blender follows their sensors, so it sees the change."""
-        if dry is not None and wet is not None and dry >= wet:
-            raise ValueError("the dry line must be drier than the wet one")
-        self.supplies.set_nominal(dry, wet)
-        return self.settings
-
-    @command
-    def reset(self, humidity: Percent | None = None) -> HumiditySimulationState:
-        """Put the chamber at `humidity` (default ambient) at once: a door opened and closed."""
-        self.chamber.reset(humidity)
-        return self.state
-
-
-def build_simulated_rig(
-    supply: tuple[Percent, Percent] = (10.0, 90.0),
-    max_flows: tuple[Positive, Positive] = (5.0, 5.0),
-    period_s: Positive = 1.0,
-    ambient: Percent = 40.0,
-    tau_s: Positive = 60.0,
-    noise_rh: float = 0.3,
-    speed: Positive = 1.0,
-) -> tuple[Rig, HumiditySimulation]:
-    """One blender on two simulated pumps, one process sensor, reading every `period_s`.
-
-    The rig runs on a [ScaledClock][flyball.sim.clock.ScaledClock] at `speed`,
-    so its time can be run faster while it serves. Returns the rig and the
-    device that holds the simulation's own knobs.
-    """
-    rig = Rig()
-    rig.clock = ScaledClock(speed)  # as `RigConfig.build` does: swapped in before anything reads it
-    pumps = DualPumps(PumpPair(dry=SimPump(), wet=SimPump()), MaxFlows(*max_flows))
-    blender = DualPumpsBlender(pumps, humidities=SupplyHumidities(*supply), name="pumps")
-    rig.add_actuator(blender)
-
-    chamber = Chamber(
-        pumps, blender.supply_humidities, rig.clock, ambient, tau_s, noise_rh=noise_rh
-    )
-    process, dry, wet = HTSource("process"), HTSource("dry"), HTSource("wet")
-    supplies = Supplies(supply, noise_rh=noise_rh)
-    # The blender follows the supply sensors, so its expected humidity tracks
-    # what the lines actually carry rather than the configured nominal values.
-    blender.set_channels(dry, wet)
-    rig.attach_observer(blender)
-    rig.start_reader(
-        FunctionReader("sht4x", {process: chamber.sample, dry: supplies.dry, wet: supplies.wet}),
-        period_s,
-    )
-    return rig, HumiditySimulation(rig, chamber, supplies)
-
-
-def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="humidity-sim", description=__doc__)
-    p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=8000)
-    p.add_argument("--period", type=float, default=1.0, help="sensor read period, seconds")
-    p.add_argument("--db", type=Path, default=Path("sim.db"), help="record into this SQLite file")
-    p.add_argument(
-        "--noise", type=float, default=0.3, help="humidity sensor noise, one sigma, %%RH"
-    )
-    p.add_argument("--speed", type=float, default=1.0, help="rig seconds per wall second")
-    p.add_argument("--no-record", action="store_true")
-    p.add_argument("--log-level", default="info")
-    args = p.parse_args(argv)
-    logging.basicConfig(level=args.log_level.upper())
-
-    import uvicorn
-    from flyball.db.sqlite import SqliteStore
-    from flyball.programmer.programmer import Programmer
-    from flyball.runtime.config import RigConfig
-    from flyball.server import create_app, set_rig, set_simulation
-    from flyball.server.deps import set_programmer, set_simulation_device, set_store
-
-    rig, simulation = build_simulated_rig(
-        period_s=args.period, noise_rh=args.noise, speed=args.speed
-    )
-    store = SqliteStore(args.db)
-    set_store(store)  # history routes read it whether or not a session is open
-    if not args.no_record:
-        rig.start_recording(store, hardware="simulated")
-    set_rig(rig)
-    set_programmer(Programmer(rig))  # programs run against the rig from the library or a document
-    # No rig file built this, so the simulation has no plants to list and nothing
-    # to save; the clock's speed is what `/api/sim` controls here.
-    set_simulation(Simulation(rig, RigConfig(name="humidity-sim")))
-    set_simulation_device(simulation)  # the chamber's knobs, at /api/sim/device
-    log.info("simulated rig on http://%s:%d", args.host, args.port)
-    uvicorn.run(create_app(), host=args.host, port=args.port, log_level=args.log_level)
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

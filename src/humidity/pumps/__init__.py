@@ -1,4 +1,3 @@
-from .config import DualPumpsConfig
 from .drivers import DualPumpDriver, PumpPair
 from .dual import DualPumps
 from .errors import FlowsOverdrivenError, PumpError
@@ -36,7 +35,6 @@ __all__ = [
     "DryWet",
     "DualPumpDriver",
     "DualPumps",
-    "DualPumpsConfig",
     "FlowsOverdrivenError",
     "MaxFlows",
     "OfBlendMax",

@@ -1,48 +1,36 @@
+"""Real hardware, imported only when actually built -- so a Pi is not required to import a driver.
+
+`LinuxPWMPump` drives one PWM channel through `linux_pwm`; `blender.py`'s
+`DualPumpBlenderConfig.build` imports it locally, on a real `linux_pwm`
+link (`humidity.links.PwmChipConfig`).
+"""
+
 from __future__ import annotations
 
-from collections.abc import Generator
+from typing import Any
 
-from flyball.core import Normalised
-from flyball.core.errors import UnachievableError
-from flyball.hardware import TCA9548_ADDRESS, Bank, I2CBus, I2CMux
-from linux_pwm import PWMChannel, PWMChip
+from flyball.core.typing import Normalised
 
 from humidity.pumps.drivers import PumpDriver
-from humidity.pumps.errors import PumpError
-from humidity.readers import HTReaderSource, HTReading, HTSetReader, HTSource
-from humidity.sht4x import SHT4X_ADDRESS, SHT4x
 
 DEFAULT_PWM_FREQUENCY: float = 20_000.0  # Hz
 
 
-class PumpFlowError(PumpError, UnachievableError):
-    """A requested flow or fraction cannot be applied."""
-
-    def __init__(self, flow: float, max_flow: float, name: str | None = None) -> None:
-        self.flow = flow
-        self.max_flow = max_flow
-        self.name = name
-        super().__init__(
-            f"flow {flow} exceeds max_flow {max_flow}" + (f" for {name}" if name else "")
-        )
-
-
 class LinuxPWMPump(PumpDriver):
-    pwm: PWMChannel
-    _frequency: float
-    _deadband: float
-    _effort: float = 0.0
+    """One `linux_pwm` channel, driven 0-1 of full with an optional deadband."""
 
     def __init__(
         self,
         channel: int,
         frequency: float,
         deadband: float = 0.0,
-        chip: PWMChip | int = 0,
+        chip: Any = 0,
         timeout: float = 10,
     ) -> None:
-        self._frequency = frequency
+        from linux_pwm import PWMChannel
+
         self._deadband = deadband
+        self._effort: Normalised = 0.0
         self.pwm = PWMChannel(channel=channel, chip=chip, timeout=timeout)
         self.pwm.set_frequency(frequency)
 
@@ -51,13 +39,13 @@ class LinuxPWMPump(PumpDriver):
         return self._deadband
 
     @property
-    def effort(self) -> float:
+    def effort(self) -> Normalised:
         return self._effort
 
     def calculate_duty_ratio(self, effort: float) -> float:
         return (1.0 - self._deadband) * max(0.0, min(effort, 1.0)) + self._deadband
 
-    def set_effort(self, effort: float) -> Normalised:
+    def set_effort(self, effort: Normalised) -> Normalised:
         self.pwm.set_duty_ratio(self.calculate_duty_ratio(effort))
         if effort > 0.0 and not self.pwm.enabled:
             self.pwm.enable()
@@ -66,80 +54,4 @@ class LinuxPWMPump(PumpDriver):
 
     def stop(self) -> None:
         self.pwm.stop()
-
-
-def labelled[T](dry: T, wet: T, process: T) -> Generator[tuple[HTReaderSource, T], None, None]:
-    yield HTReaderSource.DRY, dry
-    yield HTReaderSource.WET, wet
-    yield HTReaderSource.PROCESS, process
-
-
-def muxed_sht4x_readers(
-    i2c: I2CBus,
-    process_port: int | None = None,
-    dry_port: int | None = None,
-    wet_port: int | None = None,
-    mux_address: int = TCA9548_ADDRESS,
-    sensor_address: int = SHT4X_ADDRESS,
-) -> Bank[HTReaderSource, HTReading]:
-    """Up to three SHT4x behind a TCA9548, read together so their samples share an instant."""
-    mux = I2CMux(i2c, mux_address)
-    return Bank({
-        name: SHT4x(mux.lane(port), HTSource(name), sensor_address)
-        for name, port in labelled(dry_port, wet_port, process_port)
-        if port is not None
-    })
-
-
-def sht4x_reader(
-    i2c: I2CBus,
-    source: HTReaderSource = HTReaderSource.PROCESS,
-    address: int = SHT4X_ADDRESS,
-) -> SHT4x:
-    """One SHT4x directly on the bus."""
-    return SHT4x(i2c, HTSource(source), address)
-
-
-class MuxedI2CSHT4xReaders(HTSetReader):
-    bank: Bank[HTReaderSource, HTReading]
-
-    def __init__(
-        self,
-        i2c: I2CBus,
-        process_port: int | None = None,
-        dry_port: int | None = None,
-        wet_port: int | None = None,
-        mux_address: int = TCA9548_ADDRESS,
-        sensor_address: int = SHT4X_ADDRESS,
-        name: str = "sht4x",
-    ) -> None:
-        mux = I2CMux(i2c, mux_address)
-        # One source per fitted port; the sensor and the source share a name.
-        fitted = {
-            role: HTSource(role)
-            for role, port in labelled(dry_port, wet_port, process_port)
-            if port is not None
-        }
-        super().__init__(name, fitted)
-        self.bank = Bank({
-            role: SHT4x(mux.lane(port), fitted[role], sensor_address)
-            for role, port in labelled(dry_port, wet_port, process_port)
-            if port is not None
-        })
-
-    def read_process(self, time_ns: int) -> HTReading | Exception | None:
-        return self.bank.read_device(time_ns, HTReaderSource.PROCESS)
-
-    def read_dry(self, time_ns: int) -> HTReading | Exception | None:
-        return self.bank.read_device(time_ns, HTReaderSource.DRY)
-
-    def read_wet(self, time_ns: int) -> HTReading | Exception | None:
-        return self.bank.read_device(time_ns, HTReaderSource.WET)
-
-    def read(self, time_ns: int) -> list[HTReading | Exception]:
-        return list(
-            self.bank.read_devices(
-                time_ns,
-                [HTReaderSource.DRY, HTReaderSource.WET, HTReaderSource.PROCESS],
-            ).values()
-        )
+        self._effort = 0.0

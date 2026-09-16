@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=rig.schema.json
+# Overlay: no hardware. `hum_sensors` and `blender` swap their real drivers
+# for the generic `sim_daq`/`sim_drive` on one `MultiPlant` link, `chamber`
+# (`temp-docs/DEVICE-MODEL-PLAN.md` §1.6) -- `flyball-daemon rig.yaml sim.yaml`.
+#
+# Every rig.yaml address `hum_sensors` declares is mirrored here, same unit
+# and access (`sim_daq`'s dotted `ports:` keys put a signal in a namespace,
+# exactly as `sht4x_set` does), so a program, dashboard or session built
+# against rig.yaml runs unchanged. `blender` is reduced to its one `[W]`
+# target, `humidity`: the manual `dry_flow`/`wet_flow`/`dry_effort`/
+# `wet_effort`/`blend_flow`/`expected_humidity` signals have no analogue on
+# a `sim_drive` (no pump arithmetic to read back) and are omitted.
+
+name: humidity-sim
+clock: { speed: 1 }
+
+links:
+  i2c1: null
+  pwm0: null
+  chamber:
+    tag: sim_humidity_chamber
+    dry: 10.0
+    wet: 90.0
+    tau_s: 45.0
+    initial: 40.0
+    temperature: 21.0
+    noise: 0.3
+    seed: 7
+
+devices:
+  hum_sensors:
+    driver: sim_daq
+    label: Humidity sensors (simulated)
+    poll_s: 1
+    config:
+      link: chamber
+      ports:
+        chamber.humidity: { port: chamber_humidity, quantity: humidity, unit: "%RH" }
+        chamber.temperature: { port: chamber_temperature, quantity: temperature, unit: "°C" }
+        dry.humidity: { port: dry_humidity, quantity: humidity, unit: "%RH" }
+        dry.temperature: { port: dry_temperature, quantity: temperature, unit: "°C" }
+        wet.humidity: { port: wet_humidity, quantity: humidity, unit: "%RH" }
+        wet.temperature: { port: wet_temperature, quantity: temperature, unit: "°C" }
+
+  blender:
+    driver: sim_drive
+    label: Pump blender (simulated)
+    bound: null                            # sim_drive follows nothing; the plant is driven directly
+    config:
+      link: chamber
+      ports:
+        humidity: { port: wet_fraction, quantity: humidity, unit: "%RH", limits: [0, 100] }
+
+# blender.humidity -> hum_sensors.chamber.humidity: the same addresses as
+# rig.yaml, so its controllers entry needs no override here.

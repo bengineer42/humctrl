@@ -25,10 +25,17 @@ rpi = [
 ]
 all = ["humidity[cli,rpi]"]
 
+# What `flyball rig check`, the daemon and the schema load to make `i2c`,
+# `linux_pwm`, `sht4x`, `sht4x_set`, `dual_pump_blender` and
+# `sim_humidity_chamber` valid tags in a rig file.
+[project.entry-points."flyball.configs"]
+humidity = "humidity"
+
 [project.scripts]
+# `humidity-daemon rig.yaml` (real) or `humidity-daemon rig.yaml sim.yaml`
+# (no hardware): sim.py is now just a Config[Plant] link, not its own daemon.
 humidity = "humidity.cli:main"
 humidity-daemon = "humidity.daemon:main"
-humidity-sim = "humidity.sim:main"
 
 [tool.uv.sources]
 flyball = { path = "../../controller", editable = true }
