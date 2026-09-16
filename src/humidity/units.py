@@ -8,7 +8,9 @@ quantity, `is`, not just `==`. `FLOW` and `EFFORT` are this rig's own: the
 signals with -- name and unit, nothing else (range, precision and bands live
 on the signal). The `Annotated` aliases below type plain pydantic fields
 (a driver config's `max_flow`, a supply's `dry`/`wet`) where a bare float
-would lose the unit in the schema.
+would lose the unit in the schema -- a `Quantity` stands as its own
+`Annotated` metadata, so the alias needs no separate `UnitRef`. Bounds are
+the signal's `limits`, not the type's, so none are given here.
 """
 
 from __future__ import annotations
@@ -17,10 +19,8 @@ from typing import Annotated
 
 from flyball.core.quantity import Quantity
 from flyball.core.typing import Normalised
-from flyball.core.units import UnitRef
 from flyball.core.units.si import Litre, Minute, One
 from flyball_linux.devices.chips.sht4x import HUMIDITY, TEMPERATURE, PercentRH
-from pydantic import Field
 
 # --- units the SI does not name -------------------------------------------
 
@@ -36,13 +36,13 @@ WET_FRACTION = Quantity("wet fraction", One)
 
 # --- annotated floats, for pydantic config fields ---------------------------
 
-Humidity = Annotated[float, UnitRef(PercentRH), Field(ge=0, le=100)]
+Humidity = Annotated[float, HUMIDITY]
 """Relative humidity of a stream or the chamber."""
 
-Temperature = Annotated[float, UnitRef(TEMPERATURE.unit)]
+Temperature = Annotated[float, TEMPERATURE]
 """A sensor's temperature reading: absolute, on the Celsius scale."""
 
-Flow = Annotated[float, UnitRef(LitrePerMinute), Field(ge=0)]
+Flow = Annotated[float, FLOW]
 """Volumetric flow of a supply stream, as the pumps deliver it."""
 
 WetFraction = Normalised

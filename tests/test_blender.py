@@ -12,6 +12,7 @@ from flyball.core.device import Readable
 from flyball.core.signal import Access, Limit, Node, NodeSpec, Role, Sample, SignalSpec
 from flyball.core.typing import Normalised
 from flyball_linux.links.pwm import FakePwm
+from pydantic import TypeAdapter
 
 from humidity.blender import (
     DualPumpBlender,
@@ -23,7 +24,13 @@ from humidity.blender import (
     calculate_wet_fraction,
 )
 from humidity.pumps import DualPumps, MaxFlows, PumpPair, PwmPump, SupplyHumidities
-from humidity.units import HUMIDITY
+from humidity.units import HUMIDITY, Flow
+
+
+def test_flow_alias_carries_unit_and_quantity_in_the_schema() -> None:
+    schema = TypeAdapter(Flow).json_schema()
+    assert schema["unit"] == "L/min"
+    assert schema["quantity"] == "flow"
 
 
 class RecordingPump:
