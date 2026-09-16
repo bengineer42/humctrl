@@ -50,3 +50,6 @@ mypy_path = "src"
 packages = ["humidity"]
 strict = true
 warn_unreachable = true
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx>=0.27"]
