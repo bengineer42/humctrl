@@ -1,5 +1,73 @@
-# Sources and channels
+# Devices and signals
 
-*Which sources this rig declares, which measurands each carries, and which channel the loop controls.*
+*Which devices this rig declares, which quantities each signal carries, and which signal the controller drives.*
 
-<!-- Source material: HUMIDITY.md §1, §2 -->
+The rig has two devices — everything named in `rig.yaml` is one of these two,
+or the controller that binds them:
+
+| device | driver | what it is |
+| --- | --- | --- |
+| `hum_sensors` | `sht4x_set` | three SHT4x sensors, each its own namespace |
+| `blender` | `dual_pump_blender` | two PWM pumps, blended to a target humidity |
+
+## `hum_sensors`
+
+One `sht4x_set` device, one namespace per sensor: `chamber` (the process
+value), `dry` and `wet` (the two supply lines). Each namespace is read in
+its own I²C transaction, and each declares the same two signals:
+
+| signal | access | quantity | unit |
+| --- | --- | --- | --- |
+| `humidity` | `[RP]` | humidity | %RH |
+| `temperature` | `[RP]` | temperature | °C |
+
+So the full address list is `hum_sensors.chamber.humidity`,
+`hum_sensors.chamber.temperature`, `hum_sensors.dry.humidity`, …,
+`hum_sensors.wet.temperature` — six signals, three atomic namespaces. The
+rig file polls `chamber` every second and the two supply lines every five
+(`rig.yaml`'s `signals:` overrides, since the lines drift slowly and don't
+need the chamber's rate).
+
+## `blender`
+
+One `dual_pump_blender` device, no namespaces — every signal is on its
+root. `rig.yaml`'s own comment gives the tree the driver declares:
+
+```yaml
+    # signals the driver declares:
+    #   humidity                [W]    %RH, limits [0, 100]   the split-range target
+    #   dry_flow, wet_flow      [RPW]  L/min, together        manual flows; also the readback
+    #   dry_effort, wet_effort  [RPW]  0-1 of full, together  manual efforts; also the readback
+    #   blend_flow               [RW]  L/min                  a setting: read on demand, not streamed
+    #   expected_humidity        [RP]  %RH                    what the lines actually deliver
+```
+
+`humidity` is the only signal a controller may drive — it's the split-range
+target, and `blender.humidity` is exactly that controller's name. The rest
+are for driving or reading the pumps directly: `dry_flow`/`wet_flow` and
+`dry_effort`/`wet_effort` are `together` pairs (a demand naming one alone is
+refused — "set with wet_flow"), `blend_flow` is a setting read on demand,
+and `expected_humidity` is what `commit` computes the blend should be
+delivering, published alongside the readbacks.
+
+`blender.bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }`
+means the blender *follows* the two supply sensors: whenever either
+publishes, `blender.observe` records the new supply humidity, ready for the
+next `commit` — no bus poll of its own for that half of the picture.
+
+## The controller
+
+One controller, `blender.humidity`, named by the signal it drives:
+
+```yaml
+controllers:
+  blender.humidity:
+    signal: hum_sensors.chamber.humidity
+    law: { tag: PI, kp: 0.8, ki: 0.02, tt: 60 }
+    default: true
+```
+
+It binds the chamber's published humidity (the source, `[P]`) to the
+blender's `humidity` target (`[W]`) through a PI law, and is the rig's
+default — the one a program step or a `flyball` command uses when it names
+no controller at all.

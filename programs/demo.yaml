@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=program.schema.json
+# A tour of the humidity rig, for the simulator: drive the pumps by hand,
+# hand them to the controller under a P tuning, swap to PID bumplessly,
+# ramp both ways, start a ramp without waiting and catch it with `arrive`,
+# then stop for an operator. Wants the rig's default controller
+# (`blender.humidity`, driven from `hum_sensors.chamber.humidity`) and two
+# stored tunings, `gentle` (P) and `brisk` (PID) -- both loaded from
+# `tunings/` automatically, as this file is from `programs/`:
+#
+#     flyball-daemon rig.yaml sim.yaml --set clock.speed=6
+#     flyball program check --local programs/demo.yaml
+#     curl -X POST localhost:8000/api/programs/demo/run
+#
+# About 25 rig minutes; at 6x, four of wall time.
+name: demo
+description: >-
+  Manual pumps, P then PID regulation, ramps, an unwaited ramp caught by
+  arrive, an operator wait.
+steps:
+  # --- by hand: the controller stays manual, the blender takes demands directly ---
+  - set: { device: blender, values: { dry_flow: 2, wet_flow: 2 } }
+  - hold: { minutes: 2, message: "2 L/min each way: the chamber heads for the midpoint of the supplies" }
+  - set: { device: blender, values: { dry_effort: 0.1, wet_effort: 0.9 } }
+  - hold: { minutes: 2, message: "wet-heavy efforts: humidity climbs" }
+  - command: { device: blender, device_command: stop }
+  - hold: { minutes: 1, message: "pumps stopped: drifting back towards ambient" }
+
+  # --- closed loop: P first, then PID ---
+  - regulate: { setpoint: 60, tuning: gentle }
+  - arrive: { within: 1, readings: 5, timeout: { minutes: 8 }, message: "settling at 60 under P" }
+  - hold: { minutes: 1, message: "holding 60 under P: expect a steady offset" }
+  - regulate: { setpoint: 60, tuning: brisk }
+  - hold: { minutes: 2, message: "same setpoint, PID: the integrator closes the offset" }
+
+  # --- ramps: paced by rate, then by duration ---
+  - ramp: { to: 30, per_minute: 10 }
+  - hold: { minutes: 1, message: "dry soak at 30" }
+  - ramp: { to: 75, minutes: 3, wait: false }
+  - hold: { minutes: 1, message: "ramp to 75 running unattended" }
+  - arrive: { within: 1.5, readings: 3, timeout: { minutes: 8 }, message: "catching the ramp" }
+  - hold: { minutes: 1, message: "wet soak at 75" }
+
+  # --- the operator ---
+  - wait:
+      message: "Kick the chamber if you like (a disturbance, a supply change), then press go"
+      timeout: { minutes: 5 }
+  - arrive: { within: 1, readings: 5, timeout: { minutes: 8 }, message: "recovering" }
+
+  # --- back to manual, pumps off ---
+  - manual: blender.humidity
+  - command: { device: blender, device_command: stop }

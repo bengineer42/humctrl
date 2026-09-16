@@ -12,7 +12,7 @@ name: humidity
 
 links:
   i2c1: { tag: i2c, bus: 1 }
-  pwm0: { tag: linux_pwm, chip: 0 }
+  pwm0: { tag: pwm, chip: 0 }
 
 devices:
   hum_sensors:                             # hum_sensors.chamber/dry/wet .humidity/.temperature [RP]

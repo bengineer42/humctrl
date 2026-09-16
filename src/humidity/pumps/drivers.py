@@ -1,9 +1,12 @@
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from flyball.core.typing import Normalised
+from flyball.core.typing import Normalised, Positive
 
 from .errors import PumpErrorGroup, PumpHardwareError
 from .types import SupplyEfforts
+
+if TYPE_CHECKING:
+    from flyball_linux.links.pwm import PwmLink
 
 
 class PumpDriver(Protocol):
@@ -13,6 +16,48 @@ class PumpDriver(Protocol):
     def set_effort(self, effort: Normalised) -> Normalised: ...
 
     def stop(self) -> None: ...
+
+
+class PwmPump:
+    """One `PwmLink` channel, driven 0-1 of full with an optional deadband.
+
+    Real hardware (`flyball_linux.links.pwm.PwmConfig`, tag `pwm`) and its
+    fake (`fake_pwm`) share this protocol, so this driver -- and the
+    blender that uses it -- never touches a real chip in a test.
+    """
+
+    __slots__ = ("_deadband", "_effort", "_link", "channel", "period_ns")
+
+    def __init__(
+        self, link: "PwmLink", channel: int, frequency_hz: Positive, deadband: Normalised = 0.0
+    ) -> None:
+        self._link = link
+        self.channel = channel
+        self.period_ns = round(1e9 / frequency_hz)
+        self._deadband = deadband
+        self._effort: Normalised = 0.0
+        self._link.enable(channel, False)
+
+    @property
+    def deadband(self) -> float:
+        return self._deadband
+
+    @property
+    def effort(self) -> Normalised:
+        return self._effort
+
+    def calculate_duty_ratio(self, effort: float) -> float:
+        return (1.0 - self._deadband) * max(0.0, min(effort, 1.0)) + self._deadband
+
+    def set_effort(self, effort: Normalised) -> Normalised:
+        duty_ns = round(self.calculate_duty_ratio(effort) * self.period_ns)
+        self._link.configure(self.channel, self.period_ns, duty_ns)
+        self._link.enable(self.channel, effort > 0.0)
+        self._effort = effort
+        return self._effort
+
+    def stop(self) -> None:
+        self.set_effort(0.0)
 
 
 @runtime_checkable

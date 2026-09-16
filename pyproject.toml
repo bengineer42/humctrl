@@ -5,44 +5,37 @@ build-backend = "hatchling.build"
 [project]
 name = "humidity"
 version = "0.1.0"
-description = "Split-range humidity control rig built on flyball: SHT4x readers, dual-pump blender, daemon and CLI"
+description = "Split-range humidity control rig built on flyball: rig.yaml, the dual-pump blender, and a CLI"
 requires-python = ">=3.12"
 authors = [{ name = "Ben Laurence" }]
-dependencies = ["flyball[web]"]
+# The I2C bus (sht4x/sht4x_set) and the PWM chip (the blender's pumps) are
+# both flyball-linux's: this rig has no hardware driver of its own left,
+# only dual_pump_blender (its split-range arithmetic) and
+# sim_humidity_chamber (its simulated plant).
+dependencies = ["flyball[web]", "flyball-linux[i2c]"]
 
 classifiers = ["Private :: Do Not Upload"]
 
 [project.optional-dependencies]
 # humidity.cli is a pure HTTP client for the daemon: no hardware libraries.
 cli = ["httpx>=0.27"]
-# linux-pwm is not on PyPI; humidity.direct drives the sysfs PWM channels
-# through it, so it comes straight from the repo.
-rpi = [
-    "adafruit-blinka>=8.0",
-    "adafruit-circuitpython-sht4x>=1.0",
-    "rpi-hardware-pwm>=0.2",
-    "linux-pwm @ git+https://github.com/bengineer42/linux-pwm.git@main",
-]
-all = ["humidity[cli,rpi]"]
 
-# What `flyball rig check`, the daemon and the schema load to make `i2c`,
-# `linux_pwm`, `sht4x`, `sht4x_set`, `dual_pump_blender` and
-# `sim_humidity_chamber` valid tags in a rig file.
+# What `flyball rig check`, the daemon and the schema load to make
+# `dual_pump_blender` and `sim_humidity_chamber` valid tags in a rig file
+# (`i2c`, `sht4x`, `sht4x_set`, `pwm` come from flyball-linux's own entry point).
 [project.entry-points."flyball.configs"]
 humidity = "humidity"
 
 [project.scripts]
-# `humidity-daemon rig.yaml` (real) or `humidity-daemon rig.yaml sim.yaml`
-# (no hardware): sim.py is now just a Config[Plant] link, not its own daemon.
+# The generic `flyball-daemon` (from `flyball` itself) serves this rig --
+# `flyball-daemon rig.yaml` (real) or `flyball-daemon rig.yaml sim.yaml`
+# (no hardware) -- importing `programs/`/`tunings/` beside the rig file
+# automatically; humidity has no daemon of its own to add to that.
 humidity = "humidity.cli:main"
-humidity-daemon = "humidity.daemon:main"
 
 [tool.uv.sources]
 flyball = { path = "../../controller", editable = true }
-
-# Required for the linux-pwm git direct reference in the rpi extra.
-[tool.hatch.metadata]
-allow-direct-references = true
+flyball-linux = { path = "../../linux", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]

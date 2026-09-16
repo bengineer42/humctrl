@@ -1,4 +1,4 @@
-from .drivers import DualPumpDriver, PumpPair
+from .drivers import DualPumpDriver, PumpPair, PwmPump
 from .dual import DualPumps
 from .errors import FlowsOverdrivenError, PumpError
 from .types import (
@@ -47,6 +47,7 @@ __all__ = [
     "PumpsMode",
     "PumpsState",
     "PumpsView",
+    "PwmPump",
     "SupplyEfforts",
     "SupplyFlows",
     "SupplyHumidities",

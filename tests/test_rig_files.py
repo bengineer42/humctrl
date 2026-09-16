@@ -1,23 +1,26 @@
 """`rig.yaml` (the real rig), and `rig.yaml` + `sim.yaml` (the overlay), actually load and build.
 
-`rig.yaml` alone is not *built* here: its links are real hardware (Blinka
-I2C, a PWM chip) this suite does not have. `humidity` is imported so its
-drivers, links and plant are registered without relying on the
-`flyball.configs` entry point having been (re)installed.
+`rig.yaml` alone is not *built* here: `i2c` needs a real bus and `pwm` a
+real chip's sysfs tree, neither of which this suite has. `humidity` and
+`flyball_linux` are imported so their drivers, links and plant are
+registered without relying on the `flyball.configs` entry point having
+been (re)installed.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import flyball_linux.configs  # ruff: ignore[unused-import]
 import pytest
 from flyball.control import Transfer
 from flyball.runtime.config import load_rig_config
 from flyball.sim import SteppedClock
+from flyball_linux.links.i2c import FakeI2c
+from flyball_linux.links.pwm import FakePwm
 
 import humidity  # ruff: ignore[unused-import]
-from humidity.blender import DualPumpBlender
-from humidity.pumps import DualPumps, MaxFlows, PumpPair, SupplyHumidities
+from humidity.blender import DualPumpBlender, DualPumpBlenderConfig, PumpLineConfig, SupplyConfig
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -40,47 +43,22 @@ def test_rig_yaml_overlaid_with_sim_yaml_builds_headless() -> None:
     assert default is not None and default.name == "blender.humidity"
 
 
-class _FakeI2C:
-    """Just enough of `I2CBus` for `Sht4xSet.build()` -- no read is ever asked of it here."""
-
-    def try_lock(self) -> bool:
-        return True
-
-    def unlock(self) -> None:
-        pass
-
-    def writeto(self, address: int, buffer: bytes) -> None:
-        pass
-
-    def readfrom_into(self, address: int, buffer: bytearray) -> None:
-        pass
-
-
-class _FakePump:
-    def __init__(self) -> None:
-        self._effort = 0.0
-
-    @property
-    def effort(self) -> float:
-        return self._effort
-
-    def set_effort(self, effort: float) -> float:
-        self._effort = effort
-        return effort
-
-    def stop(self) -> None:
-        self._effort = 0.0
-
-
 def _real_blender() -> DualPumpBlender:
-    """`blender` as `rig.yaml` declares it, built directly: its pumps need real PWM hardware."""
-    pumps = DualPumps(PumpPair(_FakePump(), _FakePump()), MaxFlows(dry=2.0, wet=2.0))
-    return DualPumpBlender("blender", pumps, supply=SupplyHumidities(dry=10.0, wet=90.0))
+    """`blender` as `rig.yaml` declares it, built through its real config on a `fake_pwm` chip."""
+    config = DualPumpBlenderConfig(
+        link="pwm0",
+        dry=PumpLineConfig(channel=0, deadband=0.05, max_flow=2.0),
+        wet=PumpLineConfig(channel=1, deadband=0.05, max_flow=2.0),
+        supply=SupplyConfig(dry=10.0, wet=90.0),
+    )
+    # As `DeviceEntry.build` substitutes a link name for the built object: `model_copy`
+    # bypasses validation, since `FakePwm` is not one of `PwmLinkConfig`'s tagged members.
+    return config.model_copy(update={"link": FakePwm()}).build("blender")
 
 
 def test_the_overlay_mirrors_every_signal_rig_yaml_and_sim_yaml_both_declare() -> None:
     real_entry = load_rig_config(ROOT / "rig.yaml").devices["hum_sensors"]
-    real_sensors = real_entry.build("hum_sensors", links={"i2c1": _FakeI2C()})
+    real_sensors = real_entry.build("hum_sensors", links={"i2c1": FakeI2c()})
     real_blender = _real_blender()
 
     sim = load_rig_config([ROOT / "rig.yaml", ROOT / "sim.yaml"]).build(start=False)

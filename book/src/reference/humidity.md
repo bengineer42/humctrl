@@ -1,5 +1,7 @@
 # `humidity`
 
+*API reference, generated from the source. This package now carries only its own arithmetic and glue — the hardware drivers (`sht4x`, `sht4x_set`, `i2c`, `pwm`) live in `flyball-linux`, a dependency, and the daemon is the generic `flyball-daemon`; neither is documented here.*
+
 ::: humidity
     options:
       members: false
@@ -8,22 +10,6 @@
 ::: humidity.blender
 
 ::: humidity.cli
-
-::: humidity.commands
-
-::: humidity.configs
-
-::: humidity.daemon
-
-::: humidity.direct
-
-::: humidity.errors
-
-::: humidity.program_schema
-
-::: humidity.readers
-
-::: humidity.sht4x
 
 ::: humidity.sim
 

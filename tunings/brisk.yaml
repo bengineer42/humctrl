@@ -1,0 +1,8 @@
+# PID for the simulated chamber: 1 s samples on a ~6 s lag at full flow, so
+# the derivative gain is kept small -- at 8 it drove the pumps bang-bang on
+# sensor noise. Integral time 10 s; tracking time 5 s for anti-windup.
+tag: PID
+kp: 0.8
+ki: 0.08
+kd: 1.0
+tt: 5

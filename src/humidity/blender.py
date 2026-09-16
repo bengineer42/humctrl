@@ -11,12 +11,13 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from enum import Enum
-from typing import Any, Literal
+from typing import Literal
 
 from flyball.core.device import Device, DriverConfig, command
 from flyball.core.errors import UnachievableError
 from flyball.core.signal import Access, Node, Reading, Sample, Signal, SignalSpec, WriteState
 from flyball.core.typing import Normalised, Positive
+from flyball_linux.links.pwm import PwmLinkConfig
 from pydantic import BaseModel, ConfigDict
 
 from humidity.pumps import (
@@ -26,6 +27,7 @@ from humidity.pumps import (
     MaxFlows,
     OnOverdrive,
     PumpPair,
+    PwmPump,
     SupplyEfforts,
     SupplyFlows,
     SupplyHumidities,
@@ -224,10 +226,15 @@ class SupplyConfig(BaseModel):
 
 
 class DualPumpBlenderConfig(DriverConfig[DualPumpBlender], tag="dual_pump_blender"):
-    """Two PWM pumps on one chip, blended by `commit`."""
+    """Two channels of one PWM chip, blended by `commit`.
 
-    link: Any = None
-    """A PWM chip, by link name."""
+    The pumps write duties through the `PwmLink` protocol (flyball-linux's
+    `pwm`/`fake_pwm`), not a device of their own: the split-range
+    arithmetic is the blender's, so it owns both channels directly.
+    """
+
+    link: PwmLinkConfig | str  # type: ignore[assignment]
+    frequency_hz: Positive = 20_000.0
     dry: PumpLineConfig
     wet: PumpLineConfig
     blend_flow: Positive = 1.0
@@ -235,10 +242,10 @@ class DualPumpBlenderConfig(DriverConfig[DualPumpBlender], tag="dual_pump_blende
     """A starting supply humidity, for a rig with no sensor bound to `dry`/`wet`."""
 
     def build(self, name: str, label: str | None = None) -> DualPumpBlender:
-        from humidity.direct import DEFAULT_PWM_FREQUENCY, LinuxPWMPump
-
-        dry = LinuxPWMPump(self.dry.channel, DEFAULT_PWM_FREQUENCY, self.dry.deadband, self.link)
-        wet = LinuxPWMPump(self.wet.channel, DEFAULT_PWM_FREQUENCY, self.wet.deadband, self.link)
+        if isinstance(self.link, str):
+            raise TypeError(f"link {self.link!r} must be resolved to a PWM chip before building")
+        dry = PwmPump(self.link, self.dry.channel, self.frequency_hz, self.dry.deadband)
+        wet = PwmPump(self.link, self.wet.channel, self.frequency_hz, self.wet.deadband)
         pumps = DualPumps(PumpPair(dry, wet), MaxFlows(self.dry.max_flow, self.wet.max_flow))
         supply = (
             SupplyHumidities(self.supply.dry, self.supply.wet)

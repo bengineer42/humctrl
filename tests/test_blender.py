@@ -12,9 +12,18 @@ from flyball.core.device import Device
 from flyball.core.errors import ConflictError
 from flyball.core.signal import Access, Node, NodeSpec, Sample, SignalSpec
 from flyball.core.typing import Normalised
+from flyball_linux.links.pwm import FakePwm
 
-from humidity.blender import DualPumpBlender, Rail, SupplyHumiditiesError, calculate_wet_fraction
-from humidity.pumps import DualPumps, MaxFlows, PumpPair, SupplyHumidities
+from humidity.blender import (
+    DualPumpBlender,
+    DualPumpBlenderConfig,
+    PumpLineConfig,
+    Rail,
+    SupplyConfig,
+    SupplyHumiditiesError,
+    calculate_wet_fraction,
+)
+from humidity.pumps import DualPumps, MaxFlows, PumpPair, PwmPump, SupplyHumidities
 from humidity.units import HUMIDITY
 
 
@@ -170,3 +179,43 @@ def test_stop_is_a_command_not_a_demand(
     assert "stop" in blender.commands
     blender.stop()
     assert dry.effort == pytest.approx(0.0) and wet.effort == pytest.approx(0.0)
+
+
+class TestPwmPump:
+    """The pumps write duties through `PwmLink`, not their own hardware library."""
+
+    def test_set_effort_configures_the_channel_with_a_deadband(self) -> None:
+        chip = FakePwm()
+        pump = PwmPump(chip, channel=1, frequency_hz=1000.0, deadband=0.1)
+        pump.set_effort(0.5)
+        period_ns, duty_ns = chip.channels[1]
+        assert period_ns == 1_000_000  # 1 kHz
+        assert duty_ns == round((0.9 * 0.5 + 0.1) * period_ns)
+        assert chip.enabled[1] is True
+
+        pump.set_effort(0.0)
+        assert chip.enabled[1] is False
+
+    def test_stop_disables_the_channel(self) -> None:
+        chip = FakePwm()
+        pump = PwmPump(chip, channel=0, frequency_hz=20_000.0)
+        pump.set_effort(1.0)
+        pump.stop()
+        assert pump.effort == pytest.approx(0.0)
+        assert chip.enabled[0] is False
+
+
+def test_the_config_builds_a_working_blender_on_a_fake_pwm_chip(fresh: Any) -> None:
+    chip = FakePwm()
+    config = DualPumpBlenderConfig(
+        link="pwm0",
+        dry=PumpLineConfig(channel=0, deadband=0.05, max_flow=2.0),
+        wet=PumpLineConfig(channel=1, deadband=0.05, max_flow=2.0),
+        supply=SupplyConfig(dry=10.0, wet=90.0),
+    )
+    device = config.model_copy(update={"link": chip}).build(fresh("blender"))
+    device.apply(device.signals["dry_flow"], 0, 0.4)
+    device.apply(device.signals["wet_flow"], 0, 0.6)
+    device.commit(0)
+    assert chip.channels.keys() == {0, 1}
+    assert chip.enabled == {0: True, 1: True}

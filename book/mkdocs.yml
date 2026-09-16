@@ -57,9 +57,9 @@ nav:
       - Pumps and PWM: hardware/pumps.md
       - Bill of materials: hardware/bom.md
   - The rig:
-      - Sources and channels: rig/sources.md
-      - "The actuator: DualPumps": rig/dual-pumps.md
-      - "The sensor: SHT4x": rig/sht4x.md
+      - Devices and signals: rig/sources.md
+      - "The blender device: dual pumps": rig/dual-pumps.md
+      - "The sensor device: SHT4x": rig/sht4x.md
       - Configuration: rig/config.md
   - Operating:
       - First run: operating/first-run.md

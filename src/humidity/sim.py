@@ -1,4 +1,4 @@
-"""A humidity chamber, as a [MultiPlant][flyball.sim.furnace.MultiPlant] link: no hardware needed.
+"""A humidity chamber, as a `MultiPlant` link: no hardware needed.
 
 One input, `wet_fraction` (0 dry to 1 wet of the blend); six named
 outputs, one per leaf of the real `hum_sensors` device --
