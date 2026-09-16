@@ -172,13 +172,13 @@ class DualPumpBlender(Committable):
         if self.mode.value is Mode.BLEND:
             self._blend_pumps(time_ns)
 
-    def _blend_pumps(self, time_ns: int | None = None) -> None:
+    def _blend_pumps(self, time_ns: int | None = None, blend: BlendFlow | None = None) -> None:
         """Put the blend on the pumps: the wet fraction for the target, the flow `blend` says."""
         fraction = calculate_wet_fraction(self._supply, self._target)
         self.humidity.at_limit = (
             ("low" if fraction is Rail.DRY else "high") if isinstance(fraction, Rail) else None
         )
-        self._pumps.set_blend(self.blend.value, float(fraction))
+        self._pumps.set_blend(self.blend.value if blend is None else blend, float(fraction))
         self._push_readbacks(time_ns)
 
     def _push_readbacks(self, time_ns: int | None = None) -> None:
@@ -199,9 +199,9 @@ class DualPumpBlender(Committable):
         fraction of the most the blend can move at this mix, or a fraction of
         the flow guaranteed at every mix. Takes effect at once when blending.
         """
-        self.blend.push(flow)
         if self.mode.value is Mode.BLEND:
-            self._blend_pumps()
+            self._blend_pumps(blend=flow)  # may refuse (overdrive): then the setting stands
+        self.blend.push(flow)
 
     @command(mode=Mode.FLOWS, interrupts=True)
     def set_flows(self, dry: Annotated[Flow, dry_flow], wet: Annotated[Flow, wet_flow]) -> None:
