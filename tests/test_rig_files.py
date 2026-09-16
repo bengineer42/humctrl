@@ -83,7 +83,11 @@ def test_the_overlay_mirrors_every_signal_rig_yaml_and_sim_yaml_both_declare() -
         assert mirrored.unit is signal.unit
         assert mirrored.access == signal.access
         assert mirrored.limits == signal.limits
-    assert set(sim_blender.commands) == set(real_blender.commands) == {"stop", "set_blend"}
+    assert (
+        set(sim_blender.commands)
+        == set(real_blender.commands)
+        == {"stop", "set_blend", "set_flows", "set_efforts", "set_humidity"}
+    )
 
 
 def test_the_default_controller_settles_the_chamber_towards_its_reference() -> None:
@@ -107,7 +111,7 @@ def test_the_default_controller_settles_the_chamber_towards_its_reference() -> N
 
 
 def test_manual_flows_through_the_real_blender_settle_the_chamber_and_its_own_readback() -> None:
-    """`programs/demo.yaml`'s first step (`set: {dry_flow: 2, wet_flow: 2}`), run for real."""
+    """`programs/demo.yaml`'s first step (`set_flows` with 2 L/min each), run for real."""
     clock = SteppedClock(0)
     rig = load_rig_config(
         [ROOT / "rig.yaml", ROOT / "sim.yaml"],
@@ -118,7 +122,7 @@ def test_manual_flows_through_the_real_blender_settle_the_chamber_and_its_own_re
         ],
     ).build(clock=clock)
     blender = rig.devices["blender"]
-    rig.demand(blender.root, {"dry_flow": 2.0, "wet_flow": 2.0})
+    rig.run_command(blender, "set_flows", {"dry": 2.0, "wet": 2.0})
     clock.advance(300.0)
     chamber_humidity = rig.devices["hum_sensors"].signals["chamber.humidity"]
     # Equal flows on equal-maximum lines: the midpoint of the (bound) supplies' humidity.

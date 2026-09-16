@@ -9,7 +9,6 @@ import pytest
 from flyball.control import Transfer
 from flyball.control.laws import P
 from flyball.core.device import Readable
-from flyball.core.errors import ConflictError
 from flyball.core.signal import Access, Node, NodeSpec, Role, Sample, SignalSpec
 from flyball.core.typing import Normalised
 from flyball_linux.links.pwm import FakePwm
@@ -118,7 +117,7 @@ class TestTree:
             "wet": "flows.wet",
         }
         assert commands["set_flows"].mode is Mode.FLOWS
-        assert commands["stop"].owner_exempt
+        assert commands["stop"].interrupts and commands["set_flows"].interrupts
         assert commands["set_humidity"].demand_of == "humidity"
         assert "set_flows_dry" not in commands, "a demand a command sets gets no setter"
 
@@ -175,16 +174,18 @@ class TestCommands:
         rig.demand(blender.root, {"humidity": 50.0})
         assert blender.mode.value is Mode.BLEND and len(dry.calls) == 2
 
-    def test_a_command_is_refused_while_a_controller_drives_the_target(
+    def test_a_manual_command_interrupts_the_controller(
         self, rig: Any, sensors: Sensors, blender: DualPumpBlender
     ) -> None:
         chamber_h = sensors.signals["chamber.humidity"]
         controller = rig.attach_controller(blender.humidity, chamber_h, law=P(kp=1.0))
         controller.regulate(50.0, transfer=Transfer.RESET)
-        with pytest.raises(ConflictError, match="is driven by controller"):
-            rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
-        rig.run_command(blender, "stop")  # exempt
-        assert blender.mode.value is Mode.STOPPED
+        rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
+        assert not controller.mode.active(), "put in manual, with an event"
+        assert rig.recent[-1].kind == "interrupted"
+        assert blender.mode.value is Mode.FLOWS
+        controller.regulate(50.0, transfer=Transfer.RESET)
+        assert blender.mode.value is Mode.BLEND, "a humidity demand takes it back"
 
 
 class TestOneCommitPerDelivery:

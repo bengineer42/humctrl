@@ -9,12 +9,12 @@ split-range arithmetic once per delivery. `mode` says which is in force.
 from __future__ import annotations
 
 from enum import Enum
+from typing import Annotated
 
 from flyball.core.device import (
     Committable,
     Demand,
     DriverConfig,
-    For,
     Namespace,
     Output,
     Setting,
@@ -41,7 +41,7 @@ from humidity.pumps import (
     SupplyFlows,
     SupplyHumidities,
 )
-from humidity.units import EFFORT, FLOW, HUMIDITY, Humidity
+from humidity.units import EFFORT, FLOW, HUMIDITY, Flow, Humidity
 
 
 class BlenderError(Exception): ...
@@ -202,21 +202,23 @@ class DualPumpBlender(Committable):
         if self.mode.value is Mode.BLEND:
             self._blend_pumps()
 
-    @command(mode=Mode.FLOWS)
-    def set_flows(self, dry: For[dry_flow], wet: For[wet_flow]) -> None:
+    @command(mode=Mode.FLOWS, interrupts=True)
+    def set_flows(self, dry: Annotated[Flow, dry_flow], wet: Annotated[Flow, wet_flow]) -> None:
         """Drive each line at a flow. A line left out keeps its current flow."""
         self._pumps.set_flows(SupplyFlows(dry, wet))
         self._push_readbacks()
 
-    @command(mode=Mode.EFFORTS)
-    def set_efforts(self, dry: For[dry_effort], wet: For[wet_effort]) -> None:
+    @command(mode=Mode.EFFORTS, interrupts=True)
+    def set_efforts(
+        self, dry: Annotated[Normalised, dry_effort], wet: Annotated[Normalised, wet_effort]
+    ) -> None:
         """Drive each line at an effort, 0-1 of full. A line left out keeps its current effort."""
         self._pumps.set_efforts(SupplyEfforts(dry, wet))
         self._push_readbacks()
 
-    @command(mode=Mode.STOPPED, owner_exempt=True)
+    @command(mode=Mode.STOPPED, interrupts=True)
     def stop(self) -> None:
-        """Stop both pumps at once, whatever is driving them."""
+        """Stop both pumps at once; a controller driving the target goes to manual."""
         self._pumps.stop()
         self._push_readbacks()
 
