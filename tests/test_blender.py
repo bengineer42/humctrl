@@ -120,7 +120,9 @@ class TestTree:
         }
         assert commands["set_flows"].mode is Mode.FLOWS
         assert commands["stop"].interrupts and commands["set_flows"].interrupts
-        assert commands["set_humidity"].demand_of == "humidity"
+        assert commands["set_humidity"].demand_of is None, "a real command, not a synthesised one"
+        assert commands["set_humidity"].params["humidity"].link == "humidity"
+        assert commands["set_humidity"].mode is Mode.BLEND and commands["set_humidity"].interrupts
         assert "set_flows_dry" not in commands, "a demand a command sets gets no setter"
 
 
@@ -175,6 +177,26 @@ class TestCommands:
         assert dry.calls == [0.2], "not in BLEND: the supply reading does not re-blend"
         rig.demand(blender.root, {"humidity": 50.0})
         assert blender.mode.value is Mode.BLEND and len(dry.calls) == 2
+
+    def test_set_humidity_blends_by_hand_and_takes_the_controller_to_manual(
+        self,
+        rig: Any,
+        sensors: Sensors,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, wet = pumps
+        chamber_h = sensors.signals["chamber.humidity"]
+        controller = rig.attach_controller(blender.humidity, chamber_h, law=P(kp=1.0))
+        controller.regulate(50.0, transfer=Transfer.RESET)
+        rig.run_command(blender, "set_humidity", {"humidity": 90.0})  # blend flow left as it is
+        assert not controller.mode.active()
+        assert blender.mode.value is Mode.BLEND
+        assert blender.humidity.value == pytest.approx(90.0)
+        assert wet.calls[-1] == pytest.approx(0.5) and dry.calls[-1] == pytest.approx(0.0), (
+            "1 L/min, all wet, on a 2 L/min line"
+        )
+        assert blender.wet_fraction.value == pytest.approx(1.0)
 
     def test_a_manual_command_interrupts_the_controller(
         self, rig: Any, sensors: Sensors, blender: DualPumpBlender

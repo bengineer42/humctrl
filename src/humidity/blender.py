@@ -212,7 +212,7 @@ class DualPumpBlender(Committable):
         )
 
     @command
-    def set_blend(self, flow: BlendFlow) -> None:
+    def set_blend(self, blend_flow: BlendFlow) -> None:
         """Choose how much air the blend moves.
 
         An absolute flow (and what to do if the lines cannot give it), a
@@ -221,15 +221,25 @@ class DualPumpBlender(Committable):
         else at the next blend.
         """
         if self.mode.value is Mode.BLEND:
-            self._blend_pumps(blend=flow)  # may refuse (overdrive): then the setting stands
+            self._blend_pumps(blend=blend_flow)  # may refuse (overdrive): then the setting stands
         else:
-            self.blend_flow.push(flow)
+            self.blend_flow.push(blend_flow)
+
+    @command(mode=Mode.BLEND, interrupts=True)
+    def set_humidity(self, humidity: Humidity, blend_flow: BlendFlow) -> None:
+        """Blend to a humidity at a blend flow, by hand: the controller, if any, goes to manual.
+
+        Either left out keeps its current value. What a controller does
+        through the `humidity` demand, done in one go from a program or a form.
+        """
+        self._target = humidity
+        self._blend_pumps(blend=blend_flow)
 
     @command
-    def set_fraction(self, wet_fraction) -> None:
+    def set_fraction(self, blend_flow: BlendFlow, wet_fraction: float) -> None:
         """Set the wet fraction directly."""
         if self.mode.value is Mode.BLEND:
-            self._set_blend(None, blend=self.blend_flow.value, wet=wet_fraction)
+            self._set_blend(None, blend_flow, wet=wet_fraction)
 
     @command(mode=Mode.FLOWS, interrupts=True)
     def set_flows(self, dry: Annotated[Flow, dry_flow], wet: Annotated[Flow, wet_flow]) -> None:

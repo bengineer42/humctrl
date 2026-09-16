@@ -88,8 +88,10 @@ actual output and the current supply humidities.
   (`rig.yaml`: 2.0 L/min per line) — the limit *is* the `max_flows.dry`
   config signal, so the command form shows it and the rig clamps to it.
 - `efforts.dry`/`efforts.wet` are limited to `[0, 1]`.
-- `set_flows` and `set_efforts` take one value per line; a line left out
-  keeps its current value. They are refused while a controller drives
+- `set_humidity(humidity, blend_flow)` blends to a target by hand, at a
+  blend flow, in one go — what a controller does through the `humidity`
+  demand; `set_flows` and `set_efforts` take one value per line. An
+  argument left out keeps its current value. They are refused while a controller drives
   `humidity` (put it in manual, or detach it); `stop` is exempt and stops
   both pumps at once, whatever is driving them.
 
