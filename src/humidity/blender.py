@@ -4,9 +4,17 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from threading import RLock
 
-from flyball.core import Normalised, Observer, Percent, Reading, require
+from flyball.core import Normalised, Percent, require
 from flyball.core.errors import NotReadyError, UnachievableError
-from flyball.core.sink import Actuator, ActuatorConfig, ActuatorSettings, ActuatorState, command
+from flyball.core.reading import Reading
+from flyball.core.sink import (
+    Actuator,
+    ActuatorConfig,
+    ActuatorSettings,
+    ActuatorState,
+    Observer,
+    command,
+)
 
 from humidity.pumps import (
     BlendFlow,

@@ -3,15 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from flyball.core import (
-    Channel,
-    Labelled,
-    Measurand,
-    Percent,
-    Sample,
-    Source,
-)
-from flyball.core.reading import Reader
+from flyball.core import Labelled, Percent
+from flyball.core.reading import Channel, Measurand, Reader, Sample, Source
 from flyball.core.units import DIMENSIONLESS
 from flyball.core.units.si import Celsius
 
