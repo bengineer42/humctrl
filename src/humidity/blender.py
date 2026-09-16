@@ -235,7 +235,7 @@ class DualPumpBlender(Committable):
 
     @command(mode=Mode.MANUAL, interrupts=True)
     def set_fraction(self, blend_flow: BlendFlow, wet_fraction: float) -> None:
-        """Blend at a wet fraction by hand, at a blend flow. Either left out keeps its current value."""
+        """Blend at a wet fraction by hand, at a blend flow; either left out keeps its value."""
         self._set_blend(None, blend_flow, wet=wet_fraction)
 
     @command(mode=Mode.MANUAL, interrupts=True)
