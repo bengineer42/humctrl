@@ -90,12 +90,10 @@ def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Norma
 
 
 class Mode(Labelled):
-    """What is driving the pumps: the last command, or a humidity demand. Starts stopped."""
+    """What is driving the pumps: a humidity demand, or the last command by hand. Starts manual."""
 
     BLEND = "blend", "Blending to a target humidity"
-    FLOWS = "flows", "Flows set directly"
-    EFFORTS = "efforts", "Efforts set directly"
-    STOPPED = "stopped", "Stopped"
+    MANUAL = "manual", "Set by hand"
 
 
 DRY = Section("dry", "Dry line")
@@ -137,7 +135,7 @@ class DualPumpBlender(Committable):
     expected_humidity = Output(
         "expected_humidity", "Expected humidity", HUMIDITY, range=(0.0, 100.0), precision=1
     )
-    mode = Output("mode", "Mode", vtype=Mode, initial=Mode.STOPPED)
+    mode = Output("mode", "Mode", vtype=Mode, initial=Mode.MANUAL)
     blend = Namespace("blend", "Blend")
     blend_flow = blend.setting("flow", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
     wet_fraction = blend.demand("wet_fraction", "Wet fraction", WET_FRACTION, limits=(0.0, 1.0))
@@ -226,7 +224,7 @@ class DualPumpBlender(Committable):
             self.blend_flow.push(blend_flow)
 
     @command(mode=Mode.BLEND, interrupts=True)
-    def set_humidity(self, humidity: Humidity, blend_flow: BlendFlow) -> None:
+    def set_humidity(self, humidity: Humidity, blend_flow: BlendFlow | None = None) -> None:
         """Blend to a humidity at a blend flow, by hand: the controller, if any, goes to manual.
 
         Either left out keeps its current value. What a controller does
@@ -235,19 +233,18 @@ class DualPumpBlender(Committable):
         self._target = humidity
         self._blend_pumps(blend=blend_flow)
 
-    @command
+    @command(mode=Mode.MANUAL, interrupts=True)
     def set_fraction(self, blend_flow: BlendFlow, wet_fraction: float) -> None:
-        """Set the wet fraction directly."""
-        if self.mode.value is Mode.BLEND:
-            self._set_blend(None, blend_flow, wet=wet_fraction)
+        """Blend at a wet fraction by hand, at a blend flow. Either left out keeps its current value."""
+        self._set_blend(None, blend_flow, wet=wet_fraction)
 
-    @command(mode=Mode.FLOWS, interrupts=True)
+    @command(mode=Mode.MANUAL, interrupts=True)
     def set_flows(self, dry: Annotated[Flow, dry_flow], wet: Annotated[Flow, wet_flow]) -> None:
         """Drive each line at a flow. A line left out keeps its current flow."""
         self._pumps.set_flows(SupplyFlows(dry, wet))
         self._push_readbacks()
 
-    @command(mode=Mode.EFFORTS, interrupts=True)
+    @command(mode=Mode.MANUAL, interrupts=True)
     def set_efforts(
         self, dry: Annotated[Normalised, dry_effort], wet: Annotated[Normalised, wet_effort]
     ) -> None:
@@ -255,7 +252,7 @@ class DualPumpBlender(Committable):
         self._pumps.set_efforts(SupplyEfforts(dry, wet))
         self._push_readbacks()
 
-    @command(mode=Mode.STOPPED, interrupts=True)
+    @command(mode=Mode.MANUAL, interrupts=True)
     def stop(self) -> None:
         """Stop both pumps at once; a controller driving the target goes to manual."""
         self._pumps.stop()

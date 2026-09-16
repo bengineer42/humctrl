@@ -17,15 +17,16 @@ per input. People run its commands, which drive the lines at once.
 | `flows.dry`, `flows.wet` | demand | each line's flow, L/min: the readback, set by `set_flows` |
 | `efforts.dry`, `efforts.wet` | demand | each line's effort, 0–1 of full: the readback, set by `set_efforts` |
 | `expected_humidity` | output | what the current pump outputs should actually deliver |
-| `mode` | output | `blend`, `flows`, `efforts` or `stopped`: what is driving the pumps |
+| `mode` | output | `blend` (a humidity demand) or `manual` (the last command by hand) |
 | `blend.flow` | setting | the flow a `humidity` demand mixes to; `set_blend` |
 | `blend.wet_fraction` | demand | the share drawn from the wet line: the readback while blending; `set_fraction` sets it directly |
 | `max_flows.dry`, `max_flows.wet` | config | each line's maximum, the limit of its flow demand |
 
 The mode decides what a delivery does. A `humidity` demand puts the
 blender in `blend`, where a moved supply reading re-blends; `set_flows`,
-`set_efforts` and `stop` drive the lines at once and change the mode, so
-a manual flow is not undone by the next supply reading. The `dry`/`wet`
+`set_efforts`, `set_fraction` and `stop` drive the lines at once and put
+it in `manual`, where a supply reading changes nothing, so a manual flow
+is not undone by the next reading. The `dry`/`wet`
 sections tag each line's signals across `flows`, `efforts` and
 `max_flows`, so a UI can show the tree by line as well as by kind. The
 blender is never polled: it pushes its readbacks from `commit` and from
