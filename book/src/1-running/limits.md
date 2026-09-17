@@ -10,7 +10,7 @@ supply humidities — `dry: 0x45`, `wet: 0x46` in `hum_sensors`, whatever
 they currently read (or, on a rig with no sensor bound, the configured
 `supply.dry`/`supply.wet`). A target outside `[dry, wet]` rails to the
 nearer end rather than being refused — see [the split-range
-arithmetic](../rig/dual-pumps.md#the-split-range-arithmetic) — and the
+arithmetic](../3-devices/blender.md#the-split-range-arithmetic) — and the
 resulting `WriteState.at_limit` says which end. With room air on the dry
 line, the practical floor is ambient %RH, not zero.
 
@@ -55,7 +55,7 @@ between "off" and the deadband's floor.
 `humidity [RP]`: `[0, 100]` %RH, precision 2 (`Sht4xSet`'s declared
 signal spec). `temperature [RP]`: `[-40, 125]` °C, precision 2 — not
 clamped further by the decode itself (see [the sensor
-device](../rig/sht4x.md#one-i2c-transaction-command-to-decode)).
+device](../3-devices/sht4x.md#one-i2c-transaction-command-to-decode)).
 
 `hum_sensors.chamber` polls every 1 s (the device's own `poll_s`);
 `hum_sensors.dry`/`hum_sensors.wet` every 5 s (`rig.yaml`'s per-namespace

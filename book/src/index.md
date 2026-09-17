@@ -1,26 +1,44 @@
 # The humidity rig
 
 A chamber held at a target relative humidity by blending the output of two
-pumps — one wet, one dry — under closed-loop control. Flyball's device
-model is the substrate; this book covers only what is specific to this
-rig: the hardware, its two devices, and how to operate it.
+pumps -- one wet, one dry -- under closed-loop control, on a Raspberry Pi.
+It is an application built *on* flyball: this book covers only what is
+particular to this rig -- its hardware, its two devices, its files and how
+to operate it. Everything general -- the device model, the UI, the CLI, the
+API, programs, sessions -- is [the flyball book](https://bengineer42.github.io/flyball/latest/), and this book
+links there rather than repeating it.
 
-| You want to… | Read |
-| --- | --- |
-| build or repair the board | **Hardware** |
-| understand what the software sees and drives | **The rig** |
-| run it | **Operating** |
+## Getting started
 
-Anything about the device model, the control loop or the CLI in general is
-in the flyball book, not here.
+**I'm operating the rig.** It is built and wired; someone has started the
+daemon, or [First run](1-running/first-run.md) shows how. Then the
+[UI](https://bengineer42.github.io/flyball/latest/1-running/ui/) or the [CLI](https://bengineer42.github.io/flyball/latest/1-running/cli/) as for any
+rig; what is particular here is in [Running the rig](1-running/index.md):
+the demo program, autotuning the blend, what its failures look like, its
+limits.
+
+**I'm building or repairing it.** [Hardware](4-hardware/index.md): the Pi,
+the wiring, the pumps and the driver, the parts.
+
+**I'm changing it.** The files are [Configuration](2-config/index.md); the
+two devices it adds to flyball are [The rig's devices](3-devices/index.md).
 
 ## The rig, in one sentence
 
-Three SHT4x humidity/temperature
-sensors on one I²C bus (`hum_sensors`, driver `sht4x_set`) and two PWM-driven
-pumps blended by one driver (`blender`, driver `dual_pump_blender`); a PI
-controller (`blender.humidity`) regulates the chamber's humidity
+Three SHT4x humidity/temperature sensors on one I²C bus (`hum_sensors`,
+driver `sht4x_set`) and two PWM-driven pumps blended by one driver
+(`blender`, driver `dual_pump_blender`); a PI controller
+(`blender.humidity`) regulates the chamber's humidity
 (`hum_sensors.chamber.humidity`) by moving the blend. `rig.yaml` is the real
 rig; `sim.yaml` overlays it with no hardware attached, for development and
 for this book's examples. Both are quoted in full in
-[Configuration](rig/config.md).
+[Configuration](2-config/index.md).
+
+## Where things are
+
+| | |
+| --- | --- |
+| this book | `examples/humidity/book/` -- published beside the flyball book at `/humidity/` |
+| the package | `examples/humidity/src/humidity/`: the blender (`blender.py`), the simulated chamber (`sim.py`), units, a small CLI |
+| the files | `examples/humidity/rig.yaml`, `sim.yaml`, `programs/`, `tunings/` |
+| the drivers it relies on | `sht4x_set`, `i2c`, `pwm` from `flyball-linux` -- [Raspberry Pi and Linux buses](https://bengineer42.github.io/flyball/latest/5-integrations/linux/) |

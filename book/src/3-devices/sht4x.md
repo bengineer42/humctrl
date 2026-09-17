@@ -15,7 +15,7 @@ plus raw `write`/`read` for a chip with no register map, like this one):
 | `sht4x_set` | `Sht4xSet` | several chips, one atomic namespace each |
 
 This rig uses `sht4x_set` for `hum_sensors` — see [Devices and
-signals](sources.md) for the three namespaces it declares.
+signals](index.md) for the three namespaces it declares.
 
 ## One I2C transaction, command to decode
 
@@ -60,7 +60,7 @@ def decode(frame: bytes) -> tuple[float, float]:
 A short reply or a CRC mismatch raises `HardwareError` directly — no
 sensor-specific error type — so the polling loop takes the device offline
 rather than delivering a bad sample (see [Failure
-modes](../operating/failures.md)). Humidity is clamped to `[0, 100]` in
+modes](../1-running/failures.md)). Humidity is clamped to `[0, 100]` in
 the decode; temperature is not — a sensor can read below 0 °C or above
 the datasheet's usual span without being clipped.
 

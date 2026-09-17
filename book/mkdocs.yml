@@ -9,9 +9,9 @@ theme:
   name: material
   custom_dir: overrides       # main.html: the noai meta tag on every page
   features:
-    - navigation.sections
     - navigation.indexes
     - navigation.top
+    - toc.follow
     - content.code.copy
     - search.suggest
   palette:
@@ -58,22 +58,25 @@ plugins:
 
 nav:
   - Introduction: index.md
+  - Running the rig:
+      - 1-running/index.md
+      - First run: 1-running/first-run.md
+      - Humidity programs: 1-running/programs.md
+      - Autotune on this rig: 1-running/autotune.md
+      - Failure modes: 1-running/failures.md
+      - Limits: 1-running/limits.md
+  - Configuration:
+      - 2-config/index.md
+  - The rig's devices:
+      - 3-devices/index.md
+      - "The blender: dual pumps": 3-devices/blender.md
+      - "The sensors: SHT4x": 3-devices/sht4x.md
   - Hardware:
-      - Raspberry Pi setup: hardware/pi.md
-      - Board and wiring: hardware/board.md
-      - Pumps and PWM: hardware/pumps.md
-      - Bill of materials: hardware/bom.md
-  - The rig:
-      - Devices and signals: rig/sources.md
-      - "The blender device: dual pumps": rig/dual-pumps.md
-      - "The sensor device: SHT4x": rig/sht4x.md
-      - Configuration: rig/config.md
-  - Operating:
-      - First run: operating/first-run.md
-      - Humidity programs: operating/programs.md
-      - Autotune on this rig: operating/autotune.md
-      - Failure modes: operating/failures.md
-      - Limits: operating/limits.md
+      - 4-hardware/index.md
+      - Raspberry Pi setup: 4-hardware/pi.md
+      - Board and wiring: 4-hardware/board.md
+      - Pumps and PWM: 4-hardware/pumps.md
+      - Bill of materials: 4-hardware/bom.md
   - Reference:
-      - humidity: reference/humidity.md
-      - humidity.pumps: reference/humidity/pumps.md
+      - humidity: 5-reference/humidity.md
+      - humidity.pumps: 5-reference/humidity/pumps.md

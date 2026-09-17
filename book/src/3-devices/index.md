@@ -1,5 +1,16 @@
 # Devices and signals
 
+!!! abstract "Where you are: The rig's devices (the humidity rig)"
+    For the **developer**: the two devices this rig adds to flyball, what they declare and how they work inside.
+
+    | if instead you want to… | go to |
+    | --- | --- |
+    | operate it | [Running the rig](../1-running/index.md) |
+    | describe it in a file | [Configuration](../2-config/index.md) |
+    | build or repair it | [Hardware](../4-hardware/index.md) |
+    | look the package up | [Reference](../5-reference/humidity.md) |
+    | anything about flyball itself -- the device model, the UI, the CLI, the API | [the flyball book](https://bengineer42.github.io/flyball/latest/) |
+
 *Which devices this rig declares, which quantities each signal carries, and which signal the controller drives.*
 
 The rig has two devices — everything named in `rig.yaml` is one of these two,

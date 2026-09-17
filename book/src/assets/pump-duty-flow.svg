@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 520" width="820" height="520" font-family="system-ui, sans-serif">
+  <rect width="820" height="520" fill="#ffffff"/>
+
+  <defs>
+    <marker id="arrUp" markerWidth="9" markerHeight="9" refX="4.5" refY="8" orient="auto">
+      <path d="M0,8 L4.5,0 L9,8 Z" fill="#1a7f37"/>
+    </marker>
+    <marker id="arrDown" markerWidth="9" markerHeight="9" refX="4.5" refY="8" orient="auto">
+      <path d="M0,0 L4.5,8 L9,0 Z" fill="#c0392b"/>
+    </marker>
+    <marker id="arrDir" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#1f4e8c"/>
+    </marker>
+  </defs>
+
+  <!-- axes -->
+  <line x1="80" y1="430" x2="785" y2="430" stroke="#333" stroke-width="1.5"/>
+  <line x1="80" y1="430" x2="80" y2="40"  stroke="#333" stroke-width="1.5"/>
+  <text x="432" y="490" text-anchor="middle" font-size="15" fill="#333">PWM duty  D</text>
+  <text x="26" y="235" text-anchor="middle" font-size="15" fill="#333" transform="rotate(-90 26 235)">Flow  Q</text>
+  <text x="72" y="450" text-anchor="end" font-size="12" fill="#666">0</text>
+  <text x="760" y="450" text-anchor="middle" font-size="12" fill="#666">1</text>
+  <text x="72" y="45" text-anchor="end" font-size="12" fill="#666">Q_max</text>
+
+  <!-- ideal linear extrapolation -->
+  <line x1="202" y1="430" x2="760" y2="40" stroke="#999" stroke-width="1.3" stroke-dasharray="7 5"/>
+  <text x="640" y="112" font-size="12.5" fill="#777" transform="rotate(-32 640 112)">ideal line  Q = a(D − D₀)</text>
+
+  <!-- guide verticals -->
+  <line x1="202" y1="430" x2="202" y2="392" stroke="#bbb" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="216" y1="430" x2="216" y2="410" stroke="#bbb" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="284" y1="430" x2="284" y2="372" stroke="#bbb" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <!-- dead zone shading -->
+  <rect x="80" y="40" width="136" height="390" fill="#000" opacity="0.045"/>
+  <!-- hysteresis band shading -->
+  <rect x="216" y="40" width="68" height="390" fill="#c0392b" opacity="0.07"/>
+
+  <!-- Q = 0 along the axis, up-ramp -->
+  <line x1="80" y1="430" x2="284" y2="430" stroke="#1f4e8c" stroke-width="3"/>
+  <line x1="150" y1="430" x2="175" y2="430" stroke="#1f4e8c" stroke-width="3" marker-end="url(#arrDir)"/>
+
+  <!-- segment only reachable coming DOWN -->
+  <path d="M 216 424 Q 250 409 284 385" fill="none" stroke="#1f4e8c" stroke-width="2.5" stroke-dasharray="6 4"/>
+
+  <!-- main curve, common to both directions -->
+  <path d="M 284 385 C 318 359, 352 334, 420 284 S 556 188, 624 145 S 700 96, 760 67"
+        fill="none" stroke="#1f4e8c" stroke-width="3"/>
+  <line x1="470" y1="216" x2="496" y2="197" stroke="#1f4e8c" stroke-width="3" marker-end="url(#arrDir)"/>
+
+  <!-- breakaway jump -->
+  <line x1="284" y1="428" x2="284" y2="389" stroke="#1a7f37" stroke-width="3.5" marker-end="url(#arrUp)"/>
+  <!-- drop out -->
+  <line x1="216" y1="422" x2="216" y2="429" stroke="#c0392b" stroke-width="3.5" marker-end="url(#arrDown)"/>
+
+  <!-- x tick labels -->
+  <text x="202" y="450" text-anchor="middle" font-size="12" fill="#555">D₀</text>
+  <text x="216" y="468" text-anchor="middle" font-size="12" fill="#c0392b">D_drop</text>
+  <text x="290" y="450" text-anchor="middle" font-size="12" fill="#1a7f37">D_break</text>
+
+  <!-- annotations -->
+  <text x="148" y="70" text-anchor="middle" font-size="13" fill="#555">dead zone</text>
+  <text x="148" y="88" text-anchor="middle" font-size="13" fill="#555">Q = 0</text>
+
+  <text x="300" y="300" font-size="13" fill="#1a7f37">① vertical jump onto the line</text>
+  <text x="300" y="318" font-size="12" fill="#555">stiction breaks, rotor settles at</text>
+  <text x="300" y="334" font-size="12" fill="#555">the steady speed for that duty</text>
+
+  <text x="392" y="396" font-size="13" fill="#c0392b">② hysteresis band</text>
+  <text x="392" y="414" font-size="12" fill="#555">reachable only coming down</text>
+
+  <text x="452" y="150" font-size="13" fill="#1f4e8c">③ linear region</text>
+
+  <text x="120" y="360" font-size="13" fill="#555">④ horizontal offset:</text>
+  <text x="120" y="378" font-size="12" fill="#555">line hits zero at D₀, not 0</text>
+
+  <text x="560" y="300" font-size="13" fill="#555">⑤ slight sag below the line</text>
+  <text x="560" y="318" font-size="12" fill="#777">low end: valve slip at low speed</text>
+  <text x="560" y="334" font-size="12" fill="#777">high end: back-pressure + slip</text>
+
+  <!-- legend -->
+  <g transform="translate(560,398)">
+    <line x1="0" y1="0" x2="26" y2="0" stroke="#1a7f37" stroke-width="3.5"/>
+    <text x="33" y="4" font-size="12" fill="#333">ramping up from 0</text>
+    <line x1="0" y1="20" x2="26" y2="20" stroke="#c0392b" stroke-width="3.5"/>
+    <text x="33" y="24" font-size="12" fill="#333">ramping down to 0</text>
+  </g>
+</svg>

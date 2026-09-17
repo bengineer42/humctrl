@@ -21,7 +21,7 @@ Prefer `StepTest` here. The chamber is slow and the wet/dry blend is a
 finite resource (pump runtime, water and desiccant consumption) — a
 `RelayTest` cycles the blend back and forth for several periods to read
 the oscillation, which costs more of both than one step does, and the
-model a `StepTest` fits is reusable for [simulation](../rig/config.md)
+model a `StepTest` fits is reusable for [simulation](../2-config/index.md)
 and for re-tuning later without another run.
 
 ## Sizing the experiment
@@ -32,7 +32,7 @@ as the new plateau. Against this rig:
 
 - **`base`/`size`**: keep the step within the supply span (`dry: 10.0`,
   `wet: 90.0` in `rig.yaml`) and away from its ends — a step that rails
-  (see [The blender device](../rig/dual-pumps.md#the-split-range-arithmetic))
+  (see [The blender device](../3-devices/blender.md#the-split-range-arithmetic))
   isn't measuring the linear part of the plant. A base near the middle of
   the working range with a size of 10–15 %RH is a reasonable start.
 - **`window`**: must exceed the plant's dead time, or the flat stretch
@@ -81,7 +81,7 @@ need detuning rather than a cleverer rule.
 - **Response smaller than expected** (`ResponseTooSmallError`, from
   `RelayTest`, or a suspiciously small `error`-free fit from `StepTest`):
   `size` was too small against the noise, or the step landed near a rail
-  (see [the split-range rail](../rig/dual-pumps.md#the-split-range-arithmetic))
+  (see [the split-range rail](../3-devices/blender.md#the-split-range-arithmetic))
   and clipped.
 - **`dead_time` swallowing the whole response**: `window` was shorter
   than the true dead time, so the flat pre-response stretch was read as

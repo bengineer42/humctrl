@@ -18,7 +18,7 @@ used.
 `flyball-daemon` imports every file under `programs/` beside the rig file
 on start, so this one is already in the library once the daemon is up.
 It's a tour of the rig for the simulator — manual pumps, closed-loop
-regulation under each of the two stored [tunings](../rig/config.md#tunings),
+regulation under each of the two stored [tunings](../2-config/index.md#tunings),
 ramps paced two different ways, an unwaited ramp caught by `arrive`, and
 an operator wait:
 

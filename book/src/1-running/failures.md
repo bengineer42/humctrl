@@ -31,7 +31,7 @@ If a device's `read` takes longer than its own `poll_s`, the same
 device keeps polling, but something (a stretched I2C transaction, system
 load) is eating into the margin. Worth watching if `hum_sensors`' `poll_s:
 1` starts showing this: the fixed conversion wait (§[the sensor
-device](../rig/sht4x.md#one-i2c-transaction-command-to-decode), ~8.3 ms
+device](../3-devices/sht4x.md#one-i2c-transaction-command-to-decode), ~8.3 ms
 at high precision) is a small fraction of a second, so a slow condition
 here points at the bus or the host, not the sensor's own timing.
 
@@ -42,7 +42,7 @@ API, or a raised `ConflictError` from a script — and change nothing:
 
 - **A `together` pair set in part.** `dry_flow` and `wet_flow` (and
   `dry_effort`/`wet_effort`) must arrive in the same demand — "`'…dry_flow'
-  is set with wet_flow`". See [The blender device](../rig/dual-pumps.md).
+  is set with wet_flow`". See [The blender device](../3-devices/blender.md).
 - **A demand on a signal a controller drives.** `blender.humidity` while
   `blender.humidity` (the controller) is regulating — put it in `manual`
   first (a program step, or `POST /api/controllers/blender.humidity/manual`).

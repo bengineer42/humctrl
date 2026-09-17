@@ -1,5 +1,16 @@
 # Configuration
 
+!!! abstract "Where you are: Configuration (the humidity rig)"
+    For the person **setting the rig up**: the two files that describe it, the real and the simulated, and its tunings.
+
+    | if instead you want to… | go to |
+    | --- | --- |
+    | operate it | [Running the rig](../1-running/index.md) |
+    | understand or change its two devices | [The rig's devices](../3-devices/index.md) |
+    | build or repair it | [Hardware](../4-hardware/index.md) |
+    | look the package up | [Reference](../5-reference/humidity.md) |
+    | anything about flyball itself -- the device model, the UI, the CLI, the API | [the flyball book](https://bengineer42.github.io/flyball/latest/) |
+
 *`rig.yaml` for this rig, field by field — and `sim.yaml`, the overlay that runs it with no hardware.*
 
 ## `rig.yaml`: the real rig
@@ -71,7 +82,7 @@ only `dual_pump_blender`'s split-range arithmetic and
   A `frequency_hz` field (default 20 000 Hz) is also available in
   `config`, shared by both lines, if `rig.yaml` needs to override it.
 - **`blender.bound`** wires the blender to follow the two supply sensors'
-  humidity directly — see [The blender device](dual-pumps.md#following-the-supply-lines).
+  humidity directly — see [The blender device](../3-devices/blender.md#following-the-supply-lines).
 - **`controllers.blender.humidity`** is named by its target (`blender`'s
   `humidity` signal), regulates the chamber's published humidity through a
   PI law, and is `default: true` — the controller a program step or a
@@ -225,7 +236,7 @@ tt: 5
 
 A `regulate` program step's `tuning` names one by its stem —
 `{setpoint: 45, tuning: brisk}` swaps `blender.humidity`'s law bumplessly
-before aiming — see [Humidity programs](../operating/programs.md). Neither
+before aiming — see [Humidity programs](../1-running/programs.md). Neither
 file changes `rig.yaml`'s own `controllers.blender.humidity.law` (the PI
 gains the controller starts with); they're alternatives a program or an
 operator picks at runtime.
