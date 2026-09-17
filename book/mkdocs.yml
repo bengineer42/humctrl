@@ -21,6 +21,12 @@ theme:
       scheme: slate
       toggle: { icon: material/brightness-4, name: Light }
 
+# Versions: mike deploys each into the gh-pages branch; the theme shows a selector.
+extra:
+  version:
+    provider: mike
+    default: latest
+
 markdown_extensions:
   - admonition
   - tables
