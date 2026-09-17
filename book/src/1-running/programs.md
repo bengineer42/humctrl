@@ -90,7 +90,6 @@ A few things worth noticing:
 ## Running it
 
 ```
-flyball program check --local programs/demo.yaml   # validates offline, against the commands installed here
 flyball program check programs/demo.yaml           # validates against the live rig: names a missing tuning or controller
 flyball program run programs/demo.yaml
 flyball program status
