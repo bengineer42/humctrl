@@ -34,14 +34,14 @@ humidity = "humidity"
 humidity = "humidity.cli:main"
 
 [tool.uv.sources]
-flyball = { path = "../../controller", editable = true }
+flyball = { path = "../../engine", editable = true }
 flyball-linux = { path = "../../linux", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]
 
 [tool.ruff]
-extend = "../../controller/pyproject.toml"
+extend = "../../engine/pyproject.toml"
 src = ["src"]
 
 [tool.mypy]
