@@ -7,6 +7,7 @@ strict: true
 
 theme:
   name: material
+  custom_dir: overrides       # main.html: the noai meta tag on every page
   features:
     - navigation.sections
     - navigation.indexes

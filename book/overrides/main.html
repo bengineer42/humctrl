@@ -1,0 +1,7 @@
+{#- Ask AI crawlers not to use these pages for training. A request, not a barrier:
+    see robots.txt at the site root for the same by user agent. -#}
+{% extends "base.html" %}
+{% block extrahead %}
+  <meta name="robots" content="noai, noimageai">
+  {{ super() }}
+{% endblock %}
