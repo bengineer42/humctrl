@@ -1,19 +1,19 @@
 # First run
 
-*Start the daemon, confirm the sensor reads, drive a pump by hand, set a setpoint, stop.*
+*Start the runner, confirm the sensor reads, drive a pump by hand, set a setpoint, stop.*
 
 This walks through `sim.yaml` — no hardware needed — but every command
-below is identical against real hardware (`flyball-daemon rig.yaml`
-alone); only the addresses and the daemon's boot line change.
+below is identical against real hardware (`flyball-runner rig.yaml`
+alone); only the addresses and the runner's boot line change.
 
-## Start the daemon
+## Start the runner
 
-This rig has no daemon of its own — `flyball-daemon` (from `flyball`
+This rig has no runner of its own — `flyball-runner` (from `flyball`
 itself) serves it directly:
 
 ```
 cd examples/humidity
-uv run flyball-daemon rig.yaml sim.yaml
+uv run flyball-runner rig.yaml sim.yaml
 ```
 
 It binds to `127.0.0.1:8000` by default — loopback only — and, beside

@@ -5,8 +5,8 @@
 # blender's `humidity` target, which the blender turns into a wet fraction
 # of the pumps' shared flow (`temp-docs/DEVICE-MODEL-PLAN.md` §2).
 #
-#   flyball-daemon rig.yaml                 # real hardware
-#   flyball-daemon rig.yaml sim.yaml        # the same addresses, no hardware (see sim.yaml)
+#   flyball-runner rig.yaml                 # real hardware
+#   flyball-runner rig.yaml sim.yaml        # the same addresses, no hardware (see sim.yaml)
 
 name: humidity
 

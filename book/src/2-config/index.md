@@ -88,9 +88,9 @@ only `dual_pump_blender`'s split-range arithmetic and
   PI law, and is `default: true` — the controller a program step or a
   `flyball` command uses when it names none.
 
-Run it: `flyball-daemon rig.yaml` — real hardware, loopback-only by
-default. This package has no daemon of its own; the generic
-`flyball-daemon` also picks up a `tunings/` (and a `programs/`) directory
+Run it: `flyball-runner rig.yaml` — real hardware, loopback-only by
+default. This package has no runner of its own; the generic
+`flyball-runner` also picks up a `tunings/` (and a `programs/`) directory
 beside the rig file automatically — see [Configuration: tunings](#tunings)
 below.
 
@@ -155,7 +155,7 @@ devices:
 # rig.yaml, so its controllers entry needs no override here.
 ```
 
-An overlay is a second file passed alongside the first — `flyball-daemon
+An overlay is a second file passed alongside the first — `flyball-runner
 rig.yaml sim.yaml` — merged later-over-earlier: `null` deletes a key
 (here, `i2c1` and `pwm0`, so no real link is built), a new link
 (`chamber`, a `sim_humidity_chamber` plant — see [`HumidityChamber`
@@ -211,7 +211,7 @@ also warming a little under total flow (`flow_warming_c_per_lpm`).
 
 `examples/humidity/tunings/*.yaml` — each file a control law config, named
 by its filename stem — are loaded onto `rig.tunings` when
-`flyball-daemon` starts (`--tunings DIR` to point elsewhere; default
+`flyball-runner` starts (`--tunings DIR` to point elsewhere; default
 `tunings/` beside the first rig file). This rig ships two:
 
 ```yaml

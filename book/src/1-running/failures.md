@@ -85,9 +85,9 @@ errors, not just the first — if either does.
 ## Recovering
 
 A device stays offline until `POST /api/devices/{name}/restart`, or the
-daemon is restarted outright. Building the blender always disables both
+runner is restarted outright. Building the blender always disables both
 PWM channels first — `PwmPump.__init__` calls `link.enable(channel,
-False)` before anything else — so a fresh `flyball-daemon` start never
+False)` before anything else — so a fresh `flyball-runner` start never
 inherits a pump left running by a process that died mid-write; it's a
-property of the driver's own construction, not something the daemon has
+property of the driver's own construction, not something the runner has
 to arrange.

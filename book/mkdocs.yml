@@ -47,7 +47,7 @@ plugins:
       default_handler: python
       handlers:
         python:
-          paths: [../src, ../../../controller/src]
+          paths: [../src, ../../../engine/src]
           options:
             docstring_style: google
             docstring_options: { warn_unknown_params: false, warn_missing_types: false }

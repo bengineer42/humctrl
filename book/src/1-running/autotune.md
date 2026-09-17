@@ -3,7 +3,7 @@
 *Which experiment to run, what a good fit looks like, and what to do with a bad one.*
 
 This rig has no autotune program step or CLI command of its own — flyball's
-generic `flyball.autotune` library (`controller/src/flyball/autotune/`) is
+generic `flyball.autotune` library (`engine/src/flyball/autotune/`) is
 run as a script against the live rig, with the target controller's law
 temporarily set to `OpenLoop` so a step is applied without the PI law
 fighting it. Nothing here is humidity-specific.
