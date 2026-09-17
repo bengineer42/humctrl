@@ -1,4 +1,4 @@
-"""Command line client for a running `humidity-daemon`, over its HTTP API.
+"""Command line client for a running `humidity-runner`, over its HTTP API.
 
 Imports nothing from the domain: the wire format is the contract (plan
 `DEVICE-MODEL-PLAN.md` §4). Addresses are whatever the running rig file
@@ -36,7 +36,7 @@ def request(args: argparse.Namespace, method: str, path: str, body: Any = None) 
         response = httpx.request(method, f"{args.url}{path}", json=body, timeout=args.timeout)
     except httpx.ConnectError:
         raise CliError(
-            f"no daemon at {args.url} (is humidity.service running?)", EXIT_UNREACHABLE
+            f"no runner at {args.url} (is humidity.service running?)", EXIT_UNREACHABLE
         ) from None
     except httpx.HTTPError as e:
         raise CliError(f"{type(e).__name__}: {e}", EXIT_UNREACHABLE) from e
@@ -170,11 +170,11 @@ def cmd_watch(args: argparse.Namespace) -> None:
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="humidity", description="Control a running humidity daemon.")
+    p = argparse.ArgumentParser(prog="humidity", description="Control a running humidity runner.")
     p.add_argument(
         "--url",
         default=os.environ.get("HUMIDITY_URL", DEFAULT_URL),
-        help=f"daemon base URL (env HUMIDITY_URL, default {DEFAULT_URL})",
+        help=f"runner base URL (env HUMIDITY_URL, default {DEFAULT_URL})",
     )
     p.add_argument("--timeout", type=float, default=5.0)
     p.add_argument("--json", action="store_true", help="raw JSON, for scripting")

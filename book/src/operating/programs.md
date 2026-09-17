@@ -15,8 +15,8 @@ used.
 
 ## `programs/demo.yaml`
 
-`flyball-daemon` imports every file under `programs/` beside the rig file
-on start, so this one is already in the library once the daemon is up.
+`flyball-runner` imports every file under `programs/` beside the rig file
+on start, so this one is already in the library once the runner is up.
 It's a tour of the rig for the simulator — manual pumps, closed-loop
 regulation under each of the two stored [tunings](../rig/config.md#tunings),
 ramps paced two different ways, an unwaited ramp caught by `arrive`, and
@@ -101,6 +101,6 @@ flyball program stop                                # interrupt
 `POST /api/programs/run`; the rig normalises it and applies the first
 step before answering. `--interrupt` stops whatever is already running
 first — without it, a program already running refuses a second. At real
-time this program takes roughly 25 rig-minutes; `flyball-daemon rig.yaml
+time this program takes roughly 25 rig-minutes; `flyball-runner rig.yaml
 sim.yaml --set clock.speed=6` runs the simulated clock at 6×, about four
 minutes of wall time, to watch the whole tour.

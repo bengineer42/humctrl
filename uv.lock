@@ -226,7 +226,7 @@ wheels = [
 
 [[package]]
 name = "flyball"
-source = { editable = "../../controller" }
+source = { editable = "../../engine" }
 dependencies = [
     { name = "pydantic" },
     { name = "tomli-w" },
@@ -289,7 +289,6 @@ dev = [
 ]
 docs = [
     { name = "griffe-pydantic", specifier = ">=1.0" },
-    { name = "mike", specifier = ">=2.2.0" },
     { name = "mkdocs-material", specifier = ">=9.5" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=0.26" },
 ]
@@ -309,7 +308,7 @@ i2c = [
 
 [package.metadata]
 requires-dist = [
-    { name = "flyball", editable = "../../controller" },
+    { name = "flyball", editable = "../../engine" },
     { name = "flyball-linux", extras = ["i2c", "spi", "gpio"], marker = "extra == 'all'" },
     { name = "gpiod", marker = "extra == 'gpio'", specifier = ">=2.1" },
     { name = "smbus2", marker = "extra == 'i2c'", specifier = ">=0.4" },
@@ -458,7 +457,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "flyball", extras = ["web"], editable = "../../controller" },
+    { name = "flyball", extras = ["web"], editable = "../../engine" },
     { name = "flyball-linux", extras = ["i2c"], editable = "../../linux" },
     { name = "httpx", marker = "extra == 'cli'", specifier = ">=0.27" },
 ]

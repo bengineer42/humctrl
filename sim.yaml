@@ -3,7 +3,7 @@
 # `sim_daq`; `blender` keeps its *real* driver, `dual_pump_blender` --
 # `chamber` (`temp-docs/DEVICE-MODEL-PLAN.md` §1.6) is a `sim_humidity_chamber`
 # that is also a fake PWM chip (`humidity.sim.HumidityChamber`), so the real
-# blender drives it exactly as it would `pwm0` -- `flyball-daemon rig.yaml
+# blender drives it exactly as it would `pwm0` -- `flyball-runner rig.yaml
 # sim.yaml`.
 #
 # Because `blender` is the genuine driver, every signal, unit, role *and*
