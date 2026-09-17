@@ -2,4 +2,3 @@
 
 *What to buy.*
 
-<!-- Source material: HANDOFF.md §11 -->
