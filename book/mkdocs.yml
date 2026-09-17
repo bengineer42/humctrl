@@ -4,9 +4,13 @@ site_author: Ben Laurence
 docs_dir: src
 site_dir: ../build/book
 strict: true
+repo_url: https://github.com/bengineer42/flyball
+repo_name: ""          # the logo alone, no text
 
 theme:
   name: material
+  icon:
+    repo: fontawesome/brands/github
   custom_dir: overrides       # main.html: the noai meta tag on every page
   features:
     - navigation.indexes
