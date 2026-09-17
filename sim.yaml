@@ -46,7 +46,7 @@ links:
     sensor_tau_s: 3.0               # s, the chamber sensor's own lag
     noise_rh: 0.3                  # %RH, Gaussian, chamber reading only
     supply_noise_rh: 0.15          # %RH, Gaussian, dry/wet readings each sample
-    supply_drift_rh: 2.0           # ± %RH, slow sinusoidal supply wander (wet: 88-92)
+    supply_drift_rh: 0.5           # ± %RH, slow sinusoidal supply wander (wet: 89.5-90.5)
     supply_drift_period_s: 600.0   # s, period of the supply and temperature drift
     temperature_noise_c: 0.05      # °C, Gaussian, every temperature reading
     temperature_drift_c: 0.3       # ± °C, slow sinusoidal drift around temperature_c

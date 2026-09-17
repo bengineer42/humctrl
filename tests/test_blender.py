@@ -112,7 +112,7 @@ class TestTree:
         assert blender.signals["flows.dry"].tags == {"line": "dry"}
         assert blender.signals["efforts.wet"].tags == {"line": "wet"}
         assert blender.dry_flow.limits == (0.0, 2.0), "from the max_flows.dry config signal"
-        assert blender.humidity.limits == (0.0, 100.0)
+        assert blender.humidity.limits == (10.0, 90.0), "the supply inputs' defaults, unbound"
         assert blender.mode.value is Mode.MANUAL, "nothing drives the pumps until asked"
         assert blender.dry_max_flow.value == pytest.approx(2.0)
 
@@ -241,6 +241,20 @@ class TestOneCommitPerDelivery:
         rig.on_samples([Sample(sensors.nodes["chamber"], 2, {chamber_h: 45.0})])
         assert len(dry.calls) == 3, "the controller's source reading: one more commit"
         assert len(wet.calls) == len(dry.calls), "each commit is one write to each line"
+
+
+class TestSupplyLimits:
+    def test_the_target_is_clamped_to_what_the_bound_supply_lines_read(
+        self, rig: Any, sensors: Sensors, blender: DualPumpBlender
+    ) -> None:
+        dry_h = sensors.signals["dry.humidity"]
+        rig.bind_inputs(blender, {"dry": dry_h.address})
+        rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 25.0})])
+        assert blender.humidity.limits == (25.0, 90.0), "the bound dry line, the wet default"
+        states = rig.demand(blender.root, {"humidity": 5.0})
+        assert states[blender.humidity].value == pytest.approx(25.0)
+        assert states[blender.humidity].requested == pytest.approx(5.0)
+        assert states[blender.humidity].at_limit == Limit.LOW
 
 
 class TestRail:

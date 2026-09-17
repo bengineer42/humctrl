@@ -126,7 +126,8 @@ class DualPumpBlender(Committable):
     dry_supply = humidities.input(DRY, "Dry line humidity", HUMIDITY, default=dry_supply_default)
     wet_supply = humidities.input(WET, "Wet line humidity", HUMIDITY, default=wet_supply_default)
 
-    humidity = Demand("humidity", "Target humidity", HUMIDITY, limits=(0.0, 100.0))
+    humidity = Demand("humidity", "Target humidity", HUMIDITY, limits=(dry_supply, wet_supply))
+    """Clamped to what the lines can mix: the supply humidities, as they read now."""
     dry_flow = flows.demand(DRY, "Dry pump flow", FLOW, limits=(0.0, dry_max_flow))
     wet_flow = flows.demand(WET, "Wet pump flow", FLOW, limits=(0.0, wet_max_flow))
     dry_effort = efforts.demand(DRY, "Dry pump effort", EFFORT, limits=(0.0, 1.0))

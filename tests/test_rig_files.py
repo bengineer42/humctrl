@@ -82,7 +82,7 @@ def test_the_overlay_mirrors_every_signal_rig_yaml_and_sim_yaml_both_declare() -
         assert mirrored.address == f"blender.{path}"
         assert mirrored.unit is signal.unit
         assert mirrored.access == signal.access
-        assert mirrored.limits == signal.limits
+        assert mirrored.spec.limits == signal.spec.limits  # declared; the live values differ by supply
     assert (
         set(sim_blender.commands)
         == set(real_blender.commands)
