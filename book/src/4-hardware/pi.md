@@ -42,7 +42,7 @@ sudo apt install git python3
 curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/bengineer42/flyball.git && cd flyball/examples/humidity
 uv sync                                  # flyball, flyball-linux[i2c] and this package, into .venv
-uv run flyball-daemon rig.yaml           # the real rig; `rig.yaml sim.yaml` for the simulation
+uv run flyball-runner rig.yaml           # the real rig; `rig.yaml sim.yaml` for the simulation
 ```
 
 `flyball-linux` needs no compiled extensions for I²C and PWM (it talks to
