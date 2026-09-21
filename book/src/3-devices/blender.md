@@ -49,7 +49,7 @@ def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Norma
 ```
 
 A target outside `[dry, wet]` doesn't raise — it rails to the nearer end
-(`flyball.core.signal.Limit`, the same enum the rig's clamp reports), and
+(`flyball.foundation.device.signal.Limit`, the same enum the rig's clamp reports), and
 the delivery's write state for `humidity` carries it as `at_limit: "low"`
 or `"high"`. Only a wet-humidity-not-greater-than-dry configuration raises
 (`SupplyHumiditiesError`): with no span there is nothing to blend.
