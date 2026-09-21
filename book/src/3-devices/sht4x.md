@@ -3,7 +3,7 @@
 *How the sensor is read, at what rate, in what units, and what it reports when it fails.*
 
 This rig has no sensor driver of its own: `sht4x`/`sht4x_set` live in
-`flyball-linux` (`linux/src/flyball_linux/devices/chips/sht4x.py`), a
+`flyball-linux` (`extensions/linux/src/flyball_linux/devices/chips/sht4x.py`), a
 dependency of this package (`examples/humidity/pyproject.toml`:
 `flyball-linux[i2c]`). Both are built on `Sht4xSensor` — one chip on an
 `I2cLink` (`flyball_linux.links.i2c`: register reads/writes at an address,
