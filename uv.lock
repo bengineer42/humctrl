@@ -309,12 +309,13 @@ i2c = [
 [package.metadata]
 requires-dist = [
     { name = "flyball", editable = "../../engine" },
-    { name = "flyball-linux", extras = ["i2c", "spi", "gpio"], marker = "extra == 'all'" },
+    { name = "flyball-linux", extras = ["i2c", "spi", "gpio", "serial"], marker = "extra == 'all'" },
     { name = "gpiod", marker = "extra == 'gpio'", specifier = ">=2.1" },
+    { name = "pyserial", marker = "extra == 'serial'", specifier = ">=3.5" },
     { name = "smbus2", marker = "extra == 'i2c'", specifier = ">=0.4" },
     { name = "spidev", marker = "extra == 'spi'", specifier = ">=3.6" },
 ]
-provides-extras = ["i2c", "spi", "gpio", "all"]
+provides-extras = ["i2c", "spi", "gpio", "serial", "all"]
 
 [package.metadata.requires-dev]
 dev = [
