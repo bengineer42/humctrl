@@ -68,7 +68,7 @@ only `dual_pump_blender`'s split-range arithmetic and
 
 - **`hum_sensors.config.sensors`** declares the device's tree — one
   namespace per key, each an SHT4x at that I²C address. This is
-  `sht4x_set`'s own config (`flyball_linux.devices.chips.sht4x`), not an
+  `sht4x_set`'s own config (`flyball_chips.sht4x`), not an
   envelope key, so the tree can't be changed by `signals:` overrides, only
   by editing `sensors:` itself.
 - **`hum_sensors.signals`** is envelope overrides only: `chamber`'s

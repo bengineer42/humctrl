@@ -11,7 +11,7 @@ together.
 `hum_sensors` is polled on a period (`poll_s`); if any exception escapes
 `Sht4xSet.read` — a bad CRC or a short reply
 (`HardwareError`, raised directly by `decode` in
-`flyball_linux.devices.chips.sht4x`), or an I2C bus error under it — the
+`flyball_chips.sht4x`), or an I2C bus error under it — the
 runtime's polling loop (`flyball.runtime.polling.Polling._read`) doesn't
 retry: it records an `offline` `Condition` (`Level.ERROR`, the exception's
 message) against the device, stops polling it, and emits an event. The

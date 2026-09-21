@@ -41,4 +41,4 @@ for this book's examples. Both are quoted in full in
 | this book | `examples/humidity/book/` -- published beside the flyball book at `/humidity/` |
 | the package | `examples/humidity/src/humidity/`: the blender (`blender.py`), the simulated chamber (`sim.py`), units, a small CLI |
 | the files | `examples/humidity/rig.yaml`, `sim.yaml`, `programs/`, `tunings/` |
-| the drivers it relies on | `sht4x_set`, `i2c`, `pwm` from `flyball-linux` -- [Raspberry Pi and Linux buses](https://bengineer42.github.io/flyball/latest/5-integrations/linux/) |
+| the drivers it relies on | `sht4x_set` from `flyball-chips`, `i2c`/`pwm` from `flyball-linux` -- [Raspberry Pi and Linux buses](https://bengineer42.github.io/flyball/latest/5-integrations/linux/) |

@@ -11,7 +11,7 @@
     | build or repair it | [Hardware](../4-hardware/index.md) |
     | anything about flyball itself -- the device model, the UI, the CLI, the API | [the flyball book](https://bengineer42.github.io/flyball/latest/) |
 
-*API reference, generated from the source. This package now carries only its own arithmetic and glue — the hardware drivers (`sht4x`, `sht4x_set`, `i2c`, `pwm`) live in `flyball-linux`, a dependency, and the runner is the generic `flyball-runner`; neither is documented here.*
+*API reference, generated from the source. This package now carries only its own arithmetic and glue — the hardware drivers live in two dependencies (`sht4x`/`sht4x_set` in `flyball-chips`, `i2c`/`pwm` in `flyball-linux`), and the runner is the generic `flyball-runner`; none of that is documented here.*
 
 ::: humidity
     options:
