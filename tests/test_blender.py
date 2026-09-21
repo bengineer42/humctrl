@@ -6,7 +6,6 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
-from flyball.control import Transfer
 from flyball.control.laws import P
 from flyball.foundation.device import (
     Access,
@@ -19,6 +18,7 @@ from flyball.foundation.device import (
     SignalSpec,
 )
 from flyball.foundation.typing import Normalised
+from flyball.model.law import Transfer
 from flyball_linux.links.pwm import FakePwm
 from pydantic import TypeAdapter
 
