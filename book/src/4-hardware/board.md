@@ -3,7 +3,7 @@
 Three things hang off the Pi's header: the sensors on the I²C bus, the
 motor driver on the two PWM pins, and power for the pumps. `rig.yaml`
 names them as the `i2c1` and `pwm0` links; the board profile
-(`boards/rpi4.toml`, [Boards](https://bengineer42.github.io/flyball/latest/2-config/boards/)) says which pins
+(`flyball_linux/boards/rpi4.toml`, [Boards](https://bengineer42.github.io/flyball/latest/2-config/boards/)) says which pins
 those are.
 
 ## Sensors: I²C
