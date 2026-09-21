@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 import pytest
 from flyball.runtime.rig import Rig
-from flyball.sim import SteppedClock
+from flyball_sim import SteppedClock
 
 _counter = itertools.count()
 

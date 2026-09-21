@@ -5,7 +5,7 @@ their own maximum flows) into a chamber of `volume_l`, leaking towards
 `ambient_rh` at `exchange_per_min`; the chamber's sensor lags the true
 value by `sensor_tau_s`. It is two things at once:
 
-* a `MultiPlant` (`flyball.sim.furnace`) -- `sim_daq` (`hum_sensors`) reads
+* a `MultiPlant` (`flyball_sim.plant`) -- `sim_daq` (`hum_sensors`) reads
   its six named outputs, one per leaf the real `hum_sensors` declares
   (`chamber_humidity`, `chamber_temperature`, `dry_humidity`,
   `dry_temperature`, `wet_humidity`, `wet_temperature`);

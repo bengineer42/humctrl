@@ -15,7 +15,7 @@ import flyball_linux.configs  # ruff: ignore[unused-import]
 import pytest
 from flyball.control import Transfer
 from flyball.runtime.config import load_rig_config
-from flyball.sim import SteppedClock
+from flyball_sim import SteppedClock
 from flyball_linux.links.i2c import FakeI2c
 from flyball_linux.links.pwm import FakePwm
 

@@ -6,7 +6,7 @@ import math
 from typing import Any
 
 import pytest
-from flyball.sim.furnace import MultiPlant
+from flyball_sim.plant import MultiPlant
 from flyball_linux.links.pwm import PwmLink
 
 from humidity.blender import SupplyHumiditiesError
