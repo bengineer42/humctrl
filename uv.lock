@@ -244,7 +244,6 @@ web = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bluesky", marker = "extra == 'bluesky'", specifier = ">=1.13" },
     { name = "fastapi", marker = "extra == 'all'", specifier = ">=0.115" },
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.115" },
     { name = "httpx", marker = "extra == 'all'", specifier = ">=0.27" },
@@ -254,9 +253,7 @@ requires-dist = [
     { name = "mcp", marker = "extra == 'all'", specifier = ">=1.12" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.12" },
     { name = "mcp", marker = "extra == 'web'", specifier = ">=1.12" },
-    { name = "ophyd", marker = "extra == 'bluesky'", specifier = ">=1.9" },
     { name = "pydantic", specifier = ">=2.9" },
-    { name = "pymeasure", marker = "extra == 'pymeasure'", specifier = ">=0.13" },
     { name = "pymodbus", marker = "extra == 'modbus'", specifier = ">=3.6" },
     { name = "pyserial", marker = "extra == 'all'", specifier = ">=3.5" },
     { name = "pyserial", marker = "extra == 'serial'", specifier = ">=3.5" },
@@ -266,7 +263,6 @@ requires-dist = [
     { name = "pyyaml", marker = "extra == 'cli'", specifier = ">=6" },
     { name = "pyyaml", marker = "extra == 'mcp'", specifier = ">=6" },
     { name = "pyyaml", marker = "extra == 'web'", specifier = ">=6" },
-    { name = "qcodes", marker = "extra == 'qcodes'", specifier = ">=0.45" },
     { name = "tomli-w", specifier = ">=1.0" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'all'", specifier = ">=0.32" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'web'", specifier = ">=0.32" },
@@ -275,7 +271,7 @@ requires-dist = [
     { name = "websockets", marker = "extra == 'mcp'", specifier = ">=13" },
     { name = "websockets", marker = "extra == 'web'", specifier = ">=13" },
 ]
-provides-extras = ["all", "bluesky", "cli", "mcp", "modbus", "pymeasure", "qcodes", "serial", "visa", "web"]
+provides-extras = ["all", "cli", "mcp", "modbus", "serial", "visa", "web"]
 
 [package.metadata.requires-dev]
 dev = [
