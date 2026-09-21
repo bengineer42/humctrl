@@ -20,7 +20,7 @@ from typing import Annotated
 from flyball.core.quantity import Quantity
 from flyball.core.typing import Normalised
 from flyball.core.units.si import Litre, Minute, One
-from flyball_linux.devices.chips.sht4x import HUMIDITY, TEMPERATURE, PercentRH
+from flyball_chips.sht4x import HUMIDITY, TEMPERATURE, PercentRH
 
 # --- units the SI does not name -------------------------------------------
 

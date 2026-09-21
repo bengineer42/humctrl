@@ -8,11 +8,12 @@ version = "0.1.0"
 description = "Split-range humidity control rig built on flyball: rig.yaml, the dual-pump blender, and a CLI"
 requires-python = ">=3.12"
 authors = [{ name = "Ben Laurence" }]
-# The I2C bus (sht4x/sht4x_set) and the PWM chip (the blender's pumps) are
-# both flyball-linux's: this rig has no hardware driver of its own left,
-# only dual_pump_blender (its split-range arithmetic) and
-# sim_humidity_chamber (its simulated plant).
-dependencies = ["flyball[web]", "flyball-linux[i2c]"]
+# The I2C bus (flyball-linux) and the sht4x/sht4x_set chip driver
+# (flyball-chips, protocol-level) are separate packages since the
+# extensions/ restructure; the PWM link/chip is still flyball-linux's.
+# This rig has no hardware driver of its own left, only dual_pump_blender
+# (its split-range arithmetic) and sim_humidity_chamber (its simulated plant).
+dependencies = ["flyball[web]", "flyball-linux[i2c]", "flyball-chips"]
 
 classifiers = ["Private :: Do Not Upload"]
 
@@ -22,7 +23,8 @@ cli = ["httpx>=0.27"]
 
 # What `flyball rig check`, the runner and the schema load to make
 # `dual_pump_blender` and `sim_humidity_chamber` valid tags in a rig file
-# (`i2c`, `sht4x`, `sht4x_set`, `pwm` come from flyball-linux's own entry point).
+# (`i2c`, `pwm` come from flyball-linux's own entry point; `sht4x`/`sht4x_set`
+# from flyball-chips's).
 [project.entry-points."flyball.configs"]
 humidity = "humidity"
 
@@ -36,6 +38,7 @@ humidity = "humidity.cli:main"
 [tool.uv.sources]
 flyball = { path = "../../engine", editable = true }
 flyball-linux = { path = "../../extensions/linux", editable = true }
+flyball-chips = { path = "../../extensions/chips", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]
