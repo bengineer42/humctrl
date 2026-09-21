@@ -35,7 +35,7 @@ humidity = "humidity.cli:main"
 
 [tool.uv.sources]
 flyball = { path = "../../engine", editable = true }
-flyball-linux = { path = "../../linux", editable = true }
+flyball-linux = { path = "../../extensions/linux", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]

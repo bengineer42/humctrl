@@ -296,7 +296,7 @@ docs = [
 [[package]]
 name = "flyball-linux"
 version = "0.1.0"
-source = { editable = "../../linux" }
+source = { editable = "../../extensions/linux" }
 dependencies = [
     { name = "flyball" },
 ]
@@ -459,7 +459,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "flyball", extras = ["web"], editable = "../../engine" },
-    { name = "flyball-linux", extras = ["i2c"], editable = "../../linux" },
+    { name = "flyball-linux", extras = ["i2c"], editable = "../../extensions/linux" },
     { name = "httpx", marker = "extra == 'cli'", specifier = ">=0.27" },
 ]
 provides-extras = ["cli"]
