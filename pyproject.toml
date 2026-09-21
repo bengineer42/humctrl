@@ -26,7 +26,7 @@ cli = ["httpx>=0.27"]
 # (`i2c`, `pwm` come from flyball-linux's own entry point; `sht4x`/`sht4x_set`
 # from flyball-chips's).
 [project.entry-points."flyball.configs"]
-humidity = "humidity"
+humidity = "humidity.configs"
 
 [project.scripts]
 # The generic `flyball-runner` (from `flyball` itself) serves this rig --

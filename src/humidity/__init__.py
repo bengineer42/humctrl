@@ -1,11 +1,10 @@
-"""Registers this package's tagged configs (the blender driver and the simulated plant).
+"""The blender driver and the simulated plant.
 
-Importing `humidity` -- directly, or through the `flyball.configs` entry
-point `discover()` reads -- makes `dual_pump_blender` and
-`sim_humidity_chamber` valid in a rig file. `i2c`, `sht4x`, `sht4x_set` and
-`pwm` come from `flyball-linux`, a dependency, so importing it too is
-enough to register those (rig.yaml/sim.yaml don't need this package to do
-it explicitly).
+`humidity.configs.register` is the `flyball.configs` entry point that makes
+`dual_pump_blender` and `sim_humidity_chamber` valid tags in a rig file --
+explicit, not a side effect of importing this package. `i2c`, `sht4x`,
+`sht4x_set` and `pwm` come from `flyball-linux`, a dependency, whose own
+entry point registers those.
 """
 
 from __future__ import annotations
