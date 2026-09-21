@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from functools import cached_property
 
-from flyball.core.errors import FlyballError, HardwareError, UnachievableError
-from flyball.core.typing import Normalised, Positive
-from flyball.core.utils import format_quantity
+from flyball.foundation.errors import FlyballError, HardwareError, UnachievableError
+from flyball.foundation.quantities import format_quantity
+from flyball.foundation.typing import Normalised, Positive
 
 from .types import MaxFlows, SupplyFlows
 

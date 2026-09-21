@@ -8,9 +8,17 @@ from typing import Any
 import pytest
 from flyball.control import Transfer
 from flyball.control.laws import P
-from flyball.core.device import Readable
-from flyball.core.signal import Access, Limit, Node, NodeSpec, Role, Sample, SignalSpec
-from flyball.core.typing import Normalised
+from flyball.foundation.device import (
+    Access,
+    Limit,
+    Node,
+    NodeSpec,
+    Readable,
+    Role,
+    Sample,
+    SignalSpec,
+)
+from flyball.foundation.typing import Normalised
 from flyball_linux.links.pwm import FakePwm
 from pydantic import TypeAdapter
 

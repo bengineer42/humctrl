@@ -1,7 +1,7 @@
 from typing import NoReturn
 
-from flyball.core.typing import NonNegative, Normalised, Positive
-from flyball.core.utils import format_quantity
+from flyball.foundation.quantities import format_quantity
+from flyball.foundation.typing import NonNegative, Normalised, Positive
 
 from .drivers import DualPumpDriver
 from .errors import FlowsOverdrivenError

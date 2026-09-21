@@ -33,8 +33,8 @@ import random
 from math import pi, sin
 from typing import Literal
 
-from flyball.core.config import Config
-from flyball.core.typing import NonNegative, Positive
+from flyball.foundation.config import Config
+from flyball.foundation.typing import NonNegative, Positive
 
 from humidity.blender import SupplyHumiditiesError
 from humidity.pumps import SupplyHumidities

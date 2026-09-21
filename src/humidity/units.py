@@ -17,9 +17,9 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from flyball.core.quantity import Quantity
-from flyball.core.typing import Normalised
-from flyball.core.units.si import Litre, Minute, One
+from flyball.foundation.quantities import Quantity
+from flyball.foundation.quantities.si import Litre, Minute, One
+from flyball.foundation.typing import Normalised
 from flyball_chips.sht4x import HUMIDITY, TEMPERATURE, PercentRH
 
 # --- units the SI does not name -------------------------------------------

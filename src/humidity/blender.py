@@ -10,18 +10,19 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from flyball.core.device import (
+from flyball.foundation.device import (
     Committable,
     Demand,
     DriverConfig,
+    Limit,
     Namespace,
     Output,
+    Section,
     command,
 )
-from flyball.core.errors import UnachievableError
-from flyball.core.signal import Limit, Section
-from flyball.core.typing import Normalised, Positive
-from flyball.core.utils import Labelled
+from flyball.foundation.errors import UnachievableError
+from flyball.foundation.primitives import Labelled
+from flyball.foundation.typing import Normalised, Positive
 from flyball_linux.links.pwm import PwmLinkConfig
 from pydantic import BaseModel, ConfigDict
 

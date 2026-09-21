@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from flyball.core.typing import Normalised, Positive
+from flyball.foundation.typing import Normalised, Positive
 
 from .errors import PumpErrorGroup, PumpHardwareError
 from .types import SupplyEfforts

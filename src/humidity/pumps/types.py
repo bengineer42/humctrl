@@ -4,8 +4,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import NamedTuple, Self
 
-from flyball.core.typing import NonNegative, Normalised, Percent, Positive
-from flyball.core.utils import Labelled
+from flyball.foundation.primitives import Labelled
+from flyball.foundation.typing import NonNegative, Normalised, Percent, Positive
 
 from humidity.units import Flow, Humidity
 
