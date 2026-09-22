@@ -206,3 +206,40 @@ def test_temperatures_drift_around_the_baseline_and_the_chamber_warms_with_flow(
         expected_chamber + 2.0 * 4.0  # flow_warming_c_per_lpm * (dry + wet) flow
     )
     assert driven.output("dry_temperature") == pytest.approx(expected_dry)  # unaffected
+
+
+def test_dead_time_delays_the_mixing_effect_not_the_reading() -> None:
+    """A `configure`/`enable` change must sit in the pipe for `dead_time_s` before the
+    mixing equation sees it -- unlike `sensor_tau_s`, which lags the reading of an
+    already-arrived change. Drive a step at t=0 with `dead_time_s=1.0`: the humidity must
+    not move at all before t=1.0, then must be clearly moving once t is past it."""
+    common: dict[str, Any] = dict(
+        dry_rh=10.0,
+        wet_rh=90.0,
+        dry_flow_l_per_min=2.0,
+        wet_flow_l_per_min=2.0,
+        volume_l=1.0,
+        initial_rh=10.0,
+        exchange_per_min=0.0,
+        sensor_tau_s=0.05,
+        dead_time_s=1.0,
+        noise_rh=0.0,
+        supply_noise_rh=0.0,
+        supply_drift_rh=0.0,
+        temperature_noise_c=0.0,
+        temperature_drift_c=0.0,
+    )
+    plant = HumidityChamberConfig(**common).build()
+    plant.advance(0)
+    h0 = plant.output("chamber_humidity")
+    _drive(plant, WET_CHANNEL, 1.0)  # commanded now; must not reach the mix until t=1.0
+
+    plant.advance(round(0.95 * 1e9))
+    assert plant.output("chamber_humidity") == pytest.approx(h0, abs=1e-9)  # still nothing
+
+    plant.advance(round(1.5 * 1e9))
+    assert plant.output("chamber_humidity") > h0 + 1.0  # now clearly moving
+
+
+def test_dead_time_zero_is_the_default_and_behaves_as_before() -> None:
+    assert HumidityChamberConfig().dead_time_s == 0.0
