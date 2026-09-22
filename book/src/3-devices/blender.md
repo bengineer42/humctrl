@@ -14,13 +14,22 @@ per input. People run its commands, which drive the lines at once.
 | signal | role | what it is |
 | --- | --- | --- |
 | `humidity` | demand | the split-range target; a controller usually owns this |
-| `flows.dry`, `flows.wet` | demand | each line's flow, L/min: the readback, set by `set_flows` |
-| `efforts.dry`, `efforts.wet` | demand | each line's effort, 0–1 of full: the readback, set by `set_efforts` |
+| `flows.dry`, `flows.wet` | demand, read-only | each line's flow, L/min: the readback, set only by `set_flows` -- not directly writable |
+| `efforts.dry`, `efforts.wet` | demand, read-only | each line's effort, 0–1 of full: the readback, set only by `set_efforts` -- not directly writable |
 | `expected_humidity` | output | what the current pump outputs should actually deliver |
 | `mode` | output | `blend` (a humidity demand) or `manual` (the last command by hand) |
 | `blend.flow` | setting | the flow a `humidity` demand mixes to; `set_blend` |
 | `blend.wet_fraction` | demand | the share drawn from the wet line: the readback while blending; `set_fraction` sets it directly |
 | `max_flows.dry`, `max_flows.wet` | config | each line's maximum, the limit of its flow demand |
+| `supply_defaults.dry`, `supply_defaults.wet` | setting | the supply humidity assumed for whichever line has no sensor bound; seeded from `config.supply`, changeable live with no restart |
+
+`flows.*` and `efforts.*` are declared `access=Access.RP` (readable and
+published, not writable): `commit` only ever reads `humidity`'s
+`.pending`, so a direct write to one of these would be accepted and
+silently dropped -- the pumps would never move. The generic signal editor
+reads a signal's access from its spec, so declaring them this way is
+enough to stop it offering a write control for them; drive the lines
+through `set_flows`/`set_efforts` instead.
 
 The mode decides what a delivery does. A `humidity` demand puts the
 blender in `blend`, where a moved supply reading re-blends; `set_flows`,
@@ -75,9 +84,11 @@ signal publishes, the rig commits the blender, and `commit` reads the
 supply's newest values from the router (`self.dry_supply.value`) — there
 is no callback and no copy on the device. While blending, that re-blends;
 in any other mode it does nothing. A rig with no sensor bound uses
-`config.supply` (the `supply_defaults` config signals) instead.
-`expected_humidity` is pushed after every pump write from the pumps'
-actual output and the current supply humidities.
+`supply_defaults.dry`/`.wet` instead — settings, seeded at build from
+`config.supply` but changeable live (a `PUT` to either, no restart): a
+changed default is a moved supply too, and `commit` re-blends from it the
+same way. `expected_humidity` is pushed after every pump write from the
+pumps' actual output and the current supply humidities.
 
 ## Limits
 
@@ -117,4 +128,9 @@ pump doesn't turn) and a max flow. `config` also takes a `frequency_hz`
 (default 20 000 Hz), the PWM carrier both lines share. A rig with no
 sensor bound to `dry`/`wet` may give a starting `supply: { dry: …, wet: …
 }` in `config` instead of `bound` — see `DualPumpBlenderConfig.supply` in
-`blender.py`.
+`blender.py`. That is only the *starting* value: `supply.dry`/`.wet`
+become the `supply_defaults.dry`/`.wet` settings at build, and either can
+be moved afterwards with a `PUT` while the runner is live — no restart,
+unlike a `config` key. `config` is otherwise fixed at build: change
+`link`, a channel or a `max_flow` and the runner needs restarting to pick
+it up.

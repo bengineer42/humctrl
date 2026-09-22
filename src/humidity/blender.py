@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from flyball.foundation.device import (
+    Access,
     Committable,
     Demand,
     DriverConfig,
@@ -121,18 +122,30 @@ class DualPumpBlender(Committable):
 
     dry_max_flow = max_flows.config(DRY, "Dry max flow", FLOW)
     wet_max_flow = max_flows.config(WET, "Wet max flow", FLOW)
-    dry_supply_default = supply_defaults.config(DRY, "Dry line humidity", HUMIDITY)
-    wet_supply_default = supply_defaults.config(WET, "Wet line humidity", HUMIDITY)
+    dry_supply_default = supply_defaults.setting(
+        DRY, "Dry line humidity", HUMIDITY, access=Access.RW
+    )
+    wet_supply_default = supply_defaults.setting(
+        WET, "Wet line humidity", HUMIDITY, access=Access.RW
+    )
 
     dry_supply = humidities.input(DRY, "Dry line humidity", HUMIDITY, default=dry_supply_default)
     wet_supply = humidities.input(WET, "Wet line humidity", HUMIDITY, default=wet_supply_default)
 
     humidity = Demand("humidity", "Target humidity", HUMIDITY, limits=(dry_supply, wet_supply))
     """Clamped to what the lines can mix: the supply humidities, as they read now."""
-    dry_flow = flows.demand(DRY, "Dry pump flow", FLOW, limits=(0.0, dry_max_flow))
-    wet_flow = flows.demand(WET, "Wet pump flow", FLOW, limits=(0.0, wet_max_flow))
-    dry_effort = efforts.demand(DRY, "Dry pump effort", EFFORT, limits=(0.0, 1.0))
-    wet_effort = efforts.demand(WET, "Wet pump effort", EFFORT, limits=(0.0, 1.0))
+    # Readbacks only: `set_flows`/`set_efforts` are the only way to move these -- see
+    # `commit`, which never looks at their `.pending`. Not `access=Access.RPW`'s default for
+    # a Demand, so the generic signal editor does not offer a direct write that would be
+    # silently accepted and never reach the pumps.
+    dry_flow = flows.demand(
+        DRY, "Dry pump flow", FLOW, limits=(0.0, dry_max_flow), access=Access.RP
+    )
+    wet_flow = flows.demand(
+        WET, "Wet pump flow", FLOW, limits=(0.0, wet_max_flow), access=Access.RP
+    )
+    dry_effort = efforts.demand(DRY, "Dry pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP)
+    wet_effort = efforts.demand(WET, "Wet pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP)
 
     expected_humidity = Output(
         "expected_humidity", "Expected humidity", HUMIDITY, range=(0.0, 100.0), precision=1
@@ -167,7 +180,17 @@ class DualPumpBlender(Committable):
         return SupplyHumidities(dry=self.dry_supply.value, wet=self.wet_supply.value)
 
     def commit(self, time_ns: int) -> None:
-        """A humidity demand starts blending; while blending, a moved supply re-blends."""
+        """A humidity demand starts blending; while blending, a moved supply re-blends.
+
+        A changed `supply_defaults.*` setting is a moved supply too, for
+        whichever line has no sensor bound: pushed onto its own readback
+        before the blend recomputes, so it takes effect on the next
+        delivery with no restart -- see `_supply`.
+        """
+        if (dry_default := self.dry_supply_default.pending) is not None:
+            self.dry_supply_default.push(dry_default, time_ns)
+        if (wet_default := self.wet_supply_default.pending) is not None:
+            self.wet_supply_default.push(wet_default, time_ns)
         if (target := self.humidity.pending) is not None:
             self._target = target
             if self.mode.value is not Mode.BLEND:
