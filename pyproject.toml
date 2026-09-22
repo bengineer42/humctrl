@@ -43,9 +43,9 @@ humidity = "humidity.configs"
 # fixes it surfaced (StepTest's two-band settle check, Controller._run_on_tick's
 # tick-callback race). This pin is for the autotune integration test only -- move to a
 # `dev` commit once `autotune-command` merges.
-flyball = { git = "https://github.com/bengineer42/flyball", rev = "ad8b1195c063fd78ca56d98af1cd1231995ff523", subdirectory = "engine" }
-flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "ad8b1195c063fd78ca56d98af1cd1231995ff523", subdirectory = "extensions/linux" }
-flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "ad8b1195c063fd78ca56d98af1cd1231995ff523", subdirectory = "extensions/chips" }
+flyball = { git = "https://github.com/bengineer42/flyball", rev = "d107aac52e9fb8060cff74d86c424d908a2ead6c", subdirectory = "engine" }
+flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "d107aac52e9fb8060cff74d86c424d908a2ead6c", subdirectory = "extensions/linux" }
+flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "d107aac52e9fb8060cff74d86c424d908a2ead6c", subdirectory = "extensions/chips" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]
