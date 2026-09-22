@@ -38,11 +38,14 @@ humidity = "humidity.configs"
 # still happening to sit nested inside a flyball checkout. Bump the rev by hand when flyball
 # moves and this needs to follow.
 #
-# Pinned to `dev`'s tip: `--serve-ui`/`--uv` (flyball run) and RunnerConfig.run (runner.run
-# YAML defaults for those flags, see README/book) all merged there 22 Sep.
-flyball = { git = "https://github.com/bengineer42/flyball", rev = "7fde9ee1c50c6921cbf4fd522f1432908cd80a58", subdirectory = "engine" }
-flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "7fde9ee1c50c6921cbf4fd522f1432908cd80a58", subdirectory = "extensions/linux" }
-flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "7fde9ee1c50c6921cbf4fd522f1432908cd80a58", subdirectory = "extensions/chips" }
+# Pinned to `autotune-command`'s tip (branched off `dev-merge` 484cfbe, not merged
+# anywhere yet): the `tune` program step/one-shot command, plus two pre-existing engine
+# fixes it surfaced (StepTest's two-band settle check, Controller._run_on_tick's
+# tick-callback race). This pin is for the autotune integration test only -- move to a
+# `dev` commit once `autotune-command` merges.
+flyball = { git = "https://github.com/bengineer42/flyball", rev = "ad8b1195c063fd78ca56d98af1cd1231995ff523", subdirectory = "engine" }
+flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "ad8b1195c063fd78ca56d98af1cd1231995ff523", subdirectory = "extensions/linux" }
+flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "ad8b1195c063fd78ca56d98af1cd1231995ff523", subdirectory = "extensions/chips" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]
