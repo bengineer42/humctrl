@@ -122,6 +122,7 @@ def test_manual_flows_through_the_real_blender_settle_the_chamber_and_its_own_re
         ],
     ).build(clock=clock)
     blender = rig.devices["blender"]
+    clock.advance(5.0)  # let the dry/wet line sensors report their first real reading (poll_s: 5)
     rig.run_command(blender, "set_flows", {"dry": 2.0, "wet": 2.0})
     clock.advance(300.0)
     chamber_humidity = rig.devices["hum_sensors"].signals["chamber.humidity"]
