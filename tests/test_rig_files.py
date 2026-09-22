@@ -1,6 +1,6 @@
-"""`rig.yaml` (the real rig), and `rig.yaml` + `sim.yaml` (the overlay), actually load and build.
+"""`rig-multi-sensor.yaml` (the real rig), and `rig-multi-sensor.yaml` + `sim.yaml` (the overlay), actually load and build.
 
-`rig.yaml` alone is not *built* here: `i2c` needs a real bus and `pwm` a
+`rig-multi-sensor.yaml` alone is not *built* here: `i2c` needs a real bus and `pwm` a
 real chip's sysfs tree, neither of which this suite has. `humidity` and
 `flyball_linux` are imported so their drivers, links and plant are
 registered without relying on the `flyball.configs` entry point having
@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_rig_yaml_validates() -> None:
-    config = load_rig_config(ROOT / "rig.yaml")
+    config = load_rig_config(ROOT / "rig-multi-sensor.yaml")
     assert set(config.devices) == {"hum_sensors", "blender"}
     assert config.devices["hum_sensors"].driver == "sht4x_set"
     assert config.devices["blender"].driver == "dual_pump_blender"
@@ -34,7 +34,7 @@ def test_rig_yaml_validates() -> None:
 
 
 def test_rig_yaml_overlaid_with_sim_yaml_builds_headless() -> None:
-    rig = load_rig_config([ROOT / "rig.yaml", ROOT / "sim.yaml"]).build(start=False)
+    rig = load_rig_config([ROOT / "rig-multi-sensor.yaml", ROOT / "sim.yaml"]).build(start=False)
     assert set(rig.devices) == {"hum_sensors", "blender"}
     sensors, blender = rig.devices["hum_sensors"], rig.devices["blender"]
     assert rig.resolve("hum_sensors.chamber.humidity") is sensors.signals["chamber.humidity"]
@@ -44,7 +44,7 @@ def test_rig_yaml_overlaid_with_sim_yaml_builds_headless() -> None:
 
 
 def _real_blender() -> DualPumpBlender:
-    """`blender` as `rig.yaml` declares it, built through its real config on a `fake_pwm` chip."""
+    """`blender` as `rig-multi-sensor.yaml` declares it, built through its real config on a `fake_pwm` chip."""
     config = DualPumpBlenderConfig(
         link="pwm0",
         dry=PumpLineConfig(channel=0, deadband=0.05, max_flow=2.0),
@@ -57,11 +57,11 @@ def _real_blender() -> DualPumpBlender:
 
 
 def test_the_overlay_mirrors_every_signal_rig_yaml_and_sim_yaml_both_declare() -> None:
-    real_entry = load_rig_config(ROOT / "rig.yaml").devices["hum_sensors"]
+    real_entry = load_rig_config(ROOT / "rig-multi-sensor.yaml").devices["hum_sensors"]
     real_sensors = real_entry.build("hum_sensors", links={"i2c1": FakeI2c()})
     real_blender = _real_blender()
 
-    sim = load_rig_config([ROOT / "rig.yaml", ROOT / "sim.yaml"]).build(start=False)
+    sim = load_rig_config([ROOT / "rig-multi-sensor.yaml", ROOT / "sim.yaml"]).build(start=False)
     sim_sensors, sim_blender = sim.devices["hum_sensors"], sim.devices["blender"]
 
     assert set(real_sensors.signals) <= set(sim_sensors.signals), (
@@ -95,7 +95,7 @@ def test_the_default_controller_settles_the_chamber_towards_its_reference() -> N
     # The chamber's own drift/noise is zeroed here for a deterministic settle -- it feeds
     # the real blender's `bound` supply readings, same as a real sensor's drift would.
     rig = load_rig_config(
-        [ROOT / "rig.yaml", ROOT / "sim.yaml"],
+        [ROOT / "rig-multi-sensor.yaml", ROOT / "sim.yaml"],
         sets=[
             "links.chamber.supply_drift_rh=0",
             "links.chamber.supply_noise_rh=0",
@@ -114,7 +114,7 @@ def test_manual_flows_through_the_real_blender_settle_the_chamber_and_its_own_re
     """`programs/demo.yaml`'s first step (`set_flows` with 2 L/min each), run for real."""
     clock = SteppedClock(0)
     rig = load_rig_config(
-        [ROOT / "rig.yaml", ROOT / "sim.yaml"],
+        [ROOT / "rig-multi-sensor.yaml", ROOT / "sim.yaml"],
         sets=[
             "links.chamber.supply_drift_rh=0",
             "links.chamber.supply_noise_rh=0",

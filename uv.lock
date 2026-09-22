@@ -584,14 +584,8 @@ dependencies = [
     { name = "flyball-linux", extra = ["i2c"] },
 ]
 
-[package.optional-dependencies]
-cli = [
-    { name = "httpx" },
-]
-
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
 ]
 docs = [
@@ -605,15 +599,10 @@ requires-dist = [
     { name = "flyball", extras = ["web"], git = "https://github.com/bengineer42/flyball?subdirectory=engine&rev=f0ca0383c8570fa6c3eff7b39d9344b6b27a393a" },
     { name = "flyball-chips", git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Fchips&rev=f0ca0383c8570fa6c3eff7b39d9344b6b27a393a" },
     { name = "flyball-linux", extras = ["i2c"], git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Flinux&rev=f0ca0383c8570fa6c3eff7b39d9344b6b27a393a" },
-    { name = "httpx", marker = "extra == 'cli'", specifier = ">=0.27" },
 ]
-provides-extras = ["cli"]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "pytest", specifier = ">=8" },
-]
+dev = [{ name = "pytest", specifier = ">=8" }]
 docs = [
     { name = "griffe-pydantic", specifier = ">=1.0" },
     { name = "mkdocs-material", specifier = ">=9.5" },

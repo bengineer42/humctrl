@@ -31,7 +31,7 @@ before it steps, and treats a further `window`-second span within `band`
 as the new plateau. Against this rig:
 
 - **`base`/`size`**: keep the step within the supply span (`dry: 10.0`,
-  `wet: 90.0` in `rig.yaml`) and away from its ends — a step that rails
+  `wet: 90.0` in `rig-multi-sensor.yaml`) and away from its ends — a step that rails
   (see [The blender device](../3-devices/blender.md#the-split-range-arithmetic))
   isn't measuring the linear part of the plant. A base near the middle of
   the working range with a size of 10–15 %RH is a reasonable start.
@@ -93,5 +93,5 @@ need detuning rather than a cleverer rule.
 
 `Gains.of_ideal`/the fitted `Gains` give `kp`, `ki`, `kd`, `tt` in the same
 parallel form `blender.humidity`'s `law: { tag: PI, kp, ki, tt }` already
-uses, so a fitted result drops straight into `rig.yaml` once it looks
+uses, so a fitted result drops straight into `rig-multi-sensor.yaml` once it looks
 right.

@@ -29,7 +29,7 @@ Three SHT4x humidity/temperature sensors on one I²C bus (`hum_sensors`,
 driver `sht4x_set`) and two PWM-driven pumps blended by one driver
 (`blender`, driver `dual_pump_blender`); a PI controller
 (`blender.humidity`) regulates the chamber's humidity
-(`hum_sensors.chamber.humidity`) by moving the blend. `rig.yaml` is the real
+(`hum_sensors.chamber.humidity`) by moving the blend. `rig-multi-sensor.yaml` is the real
 rig; `sim.yaml` overlays it with no hardware attached, for development and
 for this book's examples. Both are quoted in full in
 [Configuration](2-config/index.md).
@@ -40,5 +40,5 @@ for this book's examples. Both are quoted in full in
 | --- | --- |
 | this book | `examples/humidity/book/` -- published beside the flyball book at `/humidity/` |
 | the package | `examples/humidity/src/humidity/`: the blender (`blender.py`), the simulated chamber (`sim.py`), units, a small CLI |
-| the files | `examples/humidity/rig.yaml`, `sim.yaml`, `programs/`, `tunings/` |
+| the files | `examples/humidity/rig-multi-sensor.yaml`, `sim.yaml`, `programs/`, `tunings/` |
 | the drivers it relies on | `sht4x_set` from `flyball-chips`, `i2c`/`pwm` from `flyball-linux` -- [Raspberry Pi and Linux buses](https://bengineer42.github.io/flyball/latest/5-integrations/linux/) |

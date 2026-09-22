@@ -13,7 +13,7 @@
 
 *Which devices this rig declares, which quantities each signal carries, and which signal the controller drives.*
 
-The rig has two devices — everything named in `rig.yaml` is one of these two,
+The rig has two devices — everything named in `rig-multi-sensor.yaml` is one of these two,
 or the controller that binds them:
 
 | device | driver | what it is |
@@ -36,13 +36,13 @@ So the full address list is `hum_sensors.chamber.humidity`,
 `hum_sensors.chamber.temperature`, `hum_sensors.dry.humidity`, …,
 `hum_sensors.wet.temperature` — six signals, three atomic namespaces. The
 rig file polls `chamber` every second and the two supply lines every five
-(`rig.yaml`'s `signals:` overrides, since the lines drift slowly and don't
+(`rig-multi-sensor.yaml`'s `signals:` overrides, since the lines drift slowly and don't
 need the chamber's rate).
 
 ## `blender`
 
 One `dual_pump_blender` device, no namespaces — every signal is on its
-root. `rig.yaml`'s own comment gives the tree the driver declares:
+root. `rig-multi-sensor.yaml`'s own comment gives the tree the driver declares:
 
 ```yaml
     # signals the driver declares:

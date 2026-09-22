@@ -7,7 +7,7 @@
 # stored tunings, `gentle` (P) and `brisk` (PID) -- both loaded from
 # `tunings/` automatically, as this file is from `programs/`:
 #
-#     flyball-runner rig.yaml sim.yaml --set clock.speed=6
+#     flyball-runner rig-multi-sensor.yaml sim.yaml --set clock.speed=6
 #     flyball program check --local programs/demo.yaml
 #     curl -X POST localhost:8000/api/programs/demo/run
 #

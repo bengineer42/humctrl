@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "humidity"
 version = "0.1.0"
-description = "Split-range humidity control rig built on flyball: rig.yaml, the dual-pump blender, and a CLI"
+description = "Split-range humidity control rig built on flyball: rig-multi-sensor.yaml and the dual-pump blender"
 requires-python = ">=3.12"
 authors = [{ name = "Ben Laurence" }]
 # The I2C bus (flyball-linux) and the sht4x/sht4x_set chip driver
@@ -17,10 +17,6 @@ dependencies = ["flyball[web]", "flyball-linux[i2c]", "flyball-chips"]
 
 classifiers = ["Private :: Do Not Upload"]
 
-[project.optional-dependencies]
-# humidity.cli is a pure HTTP client for the runner: no hardware libraries.
-cli = ["httpx>=0.27"]
-
 # What `flyball rig check`, the runner and the schema load to make
 # `dual_pump_blender` and `sim_humidity_chamber` valid tags in a rig file
 # (`i2c`, `pwm` come from flyball-linux's own entry point; `sht4x`/`sht4x_set`
@@ -28,12 +24,13 @@ cli = ["httpx>=0.27"]
 [project.entry-points."flyball.configs"]
 humidity = "humidity.configs"
 
-[project.scripts]
 # The generic `flyball-runner` (from `flyball` itself) serves this rig --
-# `flyball-runner rig.yaml` (real) or `flyball-runner rig.yaml sim.yaml`
+# `flyball-runner rig-multi-sensor.yaml` (real) or `flyball-runner rig-multi-sensor.yaml sim.yaml`
 # (no hardware) -- importing `programs/`/`tunings/` beside the rig file
-# automatically; humidity has no runner of its own to add to that.
-humidity = "humidity.cli:main"
+# automatically. The daemon's own `flyball` CLI (Go, `daemon/cmd/flyball`) is the generic
+# command-line client for a running runner -- `flyball read`/`demand`/`status`/`watch`/`invoke`
+# -- so this package has no CLI of its own any more (removed 22 Sep: `humidity.cli` duplicated
+# it with no capability the Go one lacks).
 
 [tool.uv.sources]
 # Pinned to a commit, not the local path: this repo (humctrl) is its own git repo, split out of
@@ -59,7 +56,7 @@ strict = true
 warn_unreachable = true
 
 [dependency-groups]
-dev = ["pytest>=8", "httpx>=0.27"]
+dev = ["pytest>=8"]
 # book/ is a MkDocs site; mkdocstrings renders the Python reference from docstrings.
 docs = [
     "mkdocs-material>=9.5",

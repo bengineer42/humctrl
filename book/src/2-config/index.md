@@ -11,16 +11,23 @@
     | look the package up | [Reference](../5-reference/humidity.md) |
     | anything about flyball itself -- the device model, the UI, the CLI, the API | [the flyball book](https://bengineer42.github.io/flyball/latest/) |
 
-*`rig.yaml` for this rig, field by field — and `sim.yaml`, the overlay that runs it with no hardware.*
+*`rig-multi-sensor.yaml` for this rig, field by field — and `sim.yaml`, the overlay that runs it with no hardware.*
 
-## `rig.yaml`: the real rig
+## `rig-multi-sensor.yaml`: the real rig
+
+The rig is two files: `blender.yaml` holds what every humidity rig shares — the
+PWM chip and the `dual_pump_blender` device on it — and each rig file `extends`
+it, adding its own sensors, the controller, and (here) `bound:` on the blender.
+`rig-single-sensor.yaml` is the bring-up variant: one `sht4x` on the chamber,
+nothing bound, the blender assuming dry 0 %RH / wet 100 %RH. Shown merged:
 
 ```yaml
 name: humidity
+extends: [blender.yaml]                    # pwm0 and the blender device come from here
 
 links:
   i2c1: { tag: i2c, bus: 1 }
-  pwm0: { tag: pwm, chip: 0 }
+  pwm0: { tag: pwm, chip: 0 }              # (blender.yaml)
 
 devices:
   hum_sensors:                             # hum_sensors.chamber/dry/wet .humidity/.temperature [RP]
@@ -38,7 +45,7 @@ devices:
       dry: { poll_s: 5 }     # the supply lines drift slowly; no need to poll them as often
       wet: { poll_s: 5 }
 
-  blender:                                 # two pumps blended into one settable humidity
+  blender:                                 # (blender.yaml) two pumps blended into one settable humidity
     driver: dual_pump_blender
     label: Pump blender
     poll_s: 1
@@ -47,7 +54,7 @@ devices:
       dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
       wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
       blend_flow: 1.0
-    bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
+    bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }   # this file's own addition
 
 controllers:
   blender.humidity:
@@ -80,7 +87,7 @@ only `dual_pump_blender`'s split-range arithmetic and
   the blender owns both channels itself rather than wrapping a
   `pwm_channel` device each, since the split-range arithmetic is its own.
   A `frequency_hz` field (default 20 000 Hz) is also available in
-  `config`, shared by both lines, if `rig.yaml` needs to override it.
+  `config`, shared by both lines, if `rig-multi-sensor.yaml` needs to override it.
 - **`blender.bound`** wires the blender to follow the two supply sensors'
   humidity directly — see [The blender device](../3-devices/blender.md#following-the-supply-lines).
 - **`controllers.blender.humidity`** is named by its target (`blender`'s
@@ -88,7 +95,7 @@ only `dual_pump_blender`'s split-range arithmetic and
   PI law, and is `default: true` — the controller a program step or a
   `flyball` command uses when it names none.
 
-Run it: `flyball-runner rig.yaml` — real hardware, loopback-only by
+Run it: `flyball-runner rig-multi-sensor.yaml` — real hardware, loopback-only by
 default. This package has no runner of its own; the generic
 `flyball-runner` also picks up a `tunings/` (and a `programs/`) directory
 beside the rig file automatically — see [Configuration: tunings](#tunings)
@@ -152,11 +159,11 @@ devices:
     bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 
 # blender.humidity -> hum_sensors.chamber.humidity: the same addresses as
-# rig.yaml, so its controllers entry needs no override here.
+# rig-multi-sensor.yaml, so its controllers entry needs no override here.
 ```
 
 An overlay is a second file passed alongside the first — `flyball-runner
-rig.yaml sim.yaml` — merged later-over-earlier: `null` deletes a key
+rig-multi-sensor.yaml sim.yaml` — merged later-over-earlier: `null` deletes a key
 (here, `i2c1` and `pwm0`, so no real link is built), a new link
 (`chamber`, a `sim_humidity_chamber` plant — see [`HumidityChamber`
 below](#the-plant-sim_humidity_chamber)) is added, and `hum_sensors` swaps
@@ -164,12 +171,12 @@ its real driver for the generic `sim_daq`. `blender` keeps its *real*
 driver, `dual_pump_blender`, unmodified: `HumidityChamber` doubles as a
 `flyball_linux.links.pwm.PwmLink` (`configure`/`enable`), so the blender
 drives it exactly as it would drive `pwm0` -- channel 0 the dry line,
-channel 1 the wet line, matching `rig.yaml`'s `dry.channel`/`wet.channel`.
+channel 1 the wet line, matching `rig-multi-sensor.yaml`'s `dry.channel`/`wet.channel`.
 `dry.max_flow`/`wet.max_flow` above are set equal to the chamber's own
 `dry_flow_l_per_min`/`wet_flow_l_per_min`, so what the blender believes it
 delivers is what the chamber actually receives.
 
-Every `hum_sensors` address `rig.yaml` declares is mirrored here, same
+Every `hum_sensors` address `rig-multi-sensor.yaml` declares is mirrored here, same
 unit and access — `sim_daq`'s `ports:` keys may contain a dot
 (`chamber.humidity: {...}`), which puts that port in a namespace exactly
 as `sht4x_set` does. Because `blender` is the genuine `DualPumpBlender`
@@ -178,7 +185,7 @@ commands match exactly — `dry_flow`/`wet_flow`/`dry_effort`/`wet_effort`/
 `blend_flow`/`expected_humidity` are the blender's own bookkeeping (from
 its configured `max_flow`s and the supply humidity it observes through
 `bound`), not read back from the chamber, precisely as on the real rig. A
-program, dashboard or session built against `rig.yaml` runs unchanged
+program, dashboard or session built against `rig-multi-sensor.yaml` runs unchanged
 against the overlay.
 
 ## The plant: `sim_humidity_chamber`
@@ -237,7 +244,7 @@ tt: 5
 A `regulate` program step's `tuning` names one by its stem —
 `{setpoint: 45, tuning: brisk}` swaps `blender.humidity`'s law bumplessly
 before aiming — see [Humidity programs](../1-running/programs.md). Neither
-file changes `rig.yaml`'s own `controllers.blender.humidity.law` (the PI
+file changes `rig-multi-sensor.yaml`'s own `controllers.blender.humidity.law` (the PI
 gains the controller starts with); they're alternatives a program or an
 operator picks at runtime.
 
@@ -245,5 +252,5 @@ operator picks at runtime.
 
 `--set devices.blender.config.blend_flow=1.5` overrides one value from the
 command line, applied after every file. A third file (say, a noisier
-plant) would overlay both `rig.yaml` and `sim.yaml` the same way — later
+plant) would overlay both `rig-multi-sensor.yaml` and `sim.yaml` the same way — later
 file wins, in the order given.

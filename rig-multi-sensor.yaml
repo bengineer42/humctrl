@@ -5,14 +5,14 @@
 # blender's `humidity` target, which the blender turns into a wet fraction
 # of the pumps' shared flow (`temp-docs/DEVICE-MODEL-PLAN.md` §2).
 #
-#   flyball-runner rig.yaml                 # real hardware
-#   flyball-runner rig.yaml sim.yaml        # the same addresses, no hardware (see sim.yaml)
+#   flyball-runner rig-multi-sensor.yaml                 # real hardware
+#   flyball-runner rig-multi-sensor.yaml sim.yaml        # the same addresses, no hardware (see sim.yaml)
 
 name: humidity
+extends: [blender.yaml]                    # the pump blender and its PWM chip
 
 links:
   i2c1: { tag: i2c, bus: 1 }
-  pwm0: { tag: pwm, chip: 0 }
 
 devices:
   hum_sensors:                             # hum_sensors.chamber/dry/wet .humidity/.temperature [RP]
@@ -30,7 +30,7 @@ devices:
         label: Chamber
         tags: { line: chamber }
         signals:
-          humidity: { label: Chamber humidity, warn: [20, 80] }
+          humidity: { label: Chamber humidity }
           temperature: { label: Chamber temperature }
       dry:                                 # the supply lines drift slowly; no need to poll them as often
         label: Dry line
@@ -43,23 +43,8 @@ devices:
         tags: { line: wet }
         signals: { humidity: { label: Wet line humidity }, temperature: { label: Wet line temperature } }
 
-  blender:                                 # two pumps blended into one settable humidity
-    driver: dual_pump_blender
-    label: Pump blender
-    config:
-      link: pwm0
-      dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
-      wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
-      blend_flow: 1.0
-    bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
-    # signals the driver declares (no poll: it pushes from commit and its commands):
-    #   humidity                 demand   %RH, limits [0, 100]  the split-range target; a controller's
-    #   flows.dry, flows.wet     demand   L/min                 readbacks; set by set_flows
-    #   efforts.dry, efforts.wet demand   0-1 of full           readbacks; set by set_efforts
-    #   expected_humidity        output   %RH                   what the lines actually deliver
-    #   mode                     output   blend|flows|efforts|stopped
-    #   blend                    setting  the flow a humidity demand mixes to; set_blend
-    #   max_flows.dry/.wet       config   L/min                 from dry/wet max_flow
+  blender:                                 # declared in blender.yaml; here only what this rig adds
+    bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }   # read the supply lines
 
 controllers:
   blender.humidity:

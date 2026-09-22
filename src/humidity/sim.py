@@ -12,7 +12,7 @@ value by `sensor_tau_s`. It is two things at once:
 * a `flyball_linux.links.pwm.PwmLink` (`configure`/`enable`) -- the real
   `dual_pump_blender` driver (unmodified) drives it exactly as it would a
   hardware PWM chip, channel 0 the dry line and channel 1 the wet line,
-  matching `rig.yaml`'s `dry.channel`/`wet.channel`. So `sim.yaml`'s
+  matching `rig-multi-sensor.yaml`'s `dry.channel`/`wet.channel`. So `sim.yaml`'s
   `blender` device is the genuine `DualPumpBlender` -- every signal, unit,
   role and command matches the real rig exactly, because it is the same
   class; `expected_humidity`, `flows.*`, `efforts.*` and `mode` are the
@@ -58,9 +58,9 @@ PORTS: tuple[Port, ...] = (
 )
 
 DRY_CHANNEL = 0
-"""The PWM channel `configure`/`enable` treats as the dry line -- `rig.yaml`'s `dry.channel`."""
+"""The PWM channel `configure`/`enable` treats as the dry line -- `rig-multi-sensor.yaml`'s `dry.channel`."""
 WET_CHANNEL = 1
-"""The PWM channel `configure`/`enable` treats as the wet line -- `rig.yaml`'s `wet.channel`."""
+"""The PWM channel `configure`/`enable` treats as the wet line -- `rig-multi-sensor.yaml`'s `wet.channel`."""
 
 # Each drifting signal gets its own phase on the one slow sinusoid, so the
 # six traces wander independently instead of moving in lockstep.

@@ -36,7 +36,7 @@ from zero:
   low end (valve slip at low speed) and the high end (back-pressure and
   slip).
 
-The software models this with two numbers per pump in `rig.yaml`:
+The software models this with two numbers per pump in `rig-multi-sensor.yaml`:
 `deadband` (the duty below which the pump is treated as off, and the offset
 the linear map starts from) and `max_flow` (the flow at full duty, L/min),
 so a flow demand maps onto the usable part of the line and a demand below

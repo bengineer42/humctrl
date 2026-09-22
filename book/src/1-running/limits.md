@@ -1,6 +1,6 @@
 # Limits
 
-*Achievable range, flow, and the reasons for each limit — as `rig.yaml` and the driver code actually declare them.*
+*Achievable range, flow, and the reasons for each limit — as `rig-multi-sensor.yaml` and the driver code actually declare them.*
 
 ## Humidity
 
@@ -15,13 +15,13 @@ resulting `WriteState.at_limit` says which end. With room air on the dry
 line, the practical floor is ambient %RH, not zero.
 
 `hum_sensors.chamber.humidity`'s own signal `range` is `[0, 100]`
-(precision 2), and `rig.yaml` adds a `warn: [20, 80]` band on top — inside
+(precision 2), and `rig-multi-sensor.yaml` adds a `warn: [20, 80]` band on top — inside
 `[0, 100]` but a narrower range the UI flags outside of, independent of
 any control limit.
 
 ## Flow
 
-Each pump line is limited to its own `max_flow` (`rig.yaml`: 2.0 L/min for
+Each pump line is limited to its own `max_flow` (`rig-multi-sensor.yaml`: 2.0 L/min for
 both `dry` and `wet`). `dry_flow`/`wet_flow [RPW]` are clamped there
 directly; `blend_flow [RW]` (the total flow a `humidity` demand mixes to)
 is not itself limited by a signal range, but the resulting per-line flows
@@ -44,7 +44,7 @@ rather than raising.
 ## Effort and deadband
 
 `dry_effort`/`wet_effort [RPW]` are `[0, 1]` of full PWM drive.
-`deadband` (`rig.yaml`: 0.05 for both lines) is the effort below which a
+`deadband` (`rig-multi-sensor.yaml`: 0.05 for both lines) is the effort below which a
 line doesn't turn — `PwmPump.calculate_duty_ratio` maps `[0, 1]`
 effort onto `[deadband, 1]` duty, so effort 0 is genuinely off and any
 effort above 0 already clears the deadband; there's no achievable duty
@@ -58,7 +58,7 @@ clamped further by the decode itself (see [the sensor
 device](../3-devices/sht4x.md#one-i2c-transaction-command-to-decode)).
 
 `hum_sensors.chamber` polls every 1 s (the device's own `poll_s`);
-`hum_sensors.dry`/`hum_sensors.wet` every 5 s (`rig.yaml`'s per-namespace
+`hum_sensors.dry`/`hum_sensors.wet` every 5 s (`rig-multi-sensor.yaml`'s per-namespace
 override) — the supply lines drift slowly enough that polling them as
 often as the chamber buys nothing. `blender` itself polls every 1 s, but
 its `read` never touches the bus: every value it reports is computed from

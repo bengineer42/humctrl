@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=rig.schema.json
+# Minimal bring-up variant of rig-multi-sensor.yaml: one SHT4x on the chamber, wired
+# directly to I2C (`sht4x`) instead of one of three in a bank (`sht4x_set`,
+# rig-multi-sensor.yaml's `hum_sensors`). No dry/wet line sensors at all -- the blender
+# is left unbound on both, so it uses its own built-in supply humidities
+# (dry 0 %RH, wet 100 %RH -- theoretical dry/saturated air) instead of a
+# sensor reading. Same pumps, same controller, same addresses otherwise.
+#
+#   flyball-runner rig-single-sensor.yaml
+
+name: humidity-single-sensor
+extends: [blender.yaml]                    # the pump blender and its PWM chip
+
+links:
+  i2c1: { tag: i2c, bus: 1 }
+
+devices:
+  chamber_sensor:                          # chamber_sensor.humidity/.temperature [RP]
+    driver: sht4x
+    label: Chamber sensor
+    poll_s: 1
+    link: i2c1
+    address: 0x44
+    signals:
+      humidity: { label: Chamber humidity }
+      temperature: { label: Chamber temperature }
+
+  # blender: declared in blender.yaml, nothing added here -- with no dry/wet sensor to
+  # bind, its `supply` stays at the default (dry 0 %RH, wet 100 %RH).
+
+controllers:
+  blender.humidity:
+    signal: chamber_sensor.humidity
+    law: { tag: PI, kp: 0.8, ki: 0.02, tt: 60 }
+    default: true

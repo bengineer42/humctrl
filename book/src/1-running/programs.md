@@ -100,6 +100,6 @@ flyball program stop                                # interrupt
 `POST /api/programs/run`; the rig normalises it and applies the first
 step before answering. `--interrupt` stops whatever is already running
 first — without it, a program already running refuses a second. At real
-time this program takes roughly 25 rig-minutes; `flyball-runner rig.yaml
+time this program takes roughly 25 rig-minutes; `flyball-runner rig-multi-sensor.yaml
 sim.yaml --set clock.speed=6` runs the simulated clock at 6×, about four
 minutes of wall time, to watch the whole tour.

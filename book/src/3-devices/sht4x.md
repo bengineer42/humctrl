@@ -74,7 +74,7 @@ node)`:
 - given no node (the periodic poll), reads only the namespaces **due** —
   at least `0.9 × poll_s` since the last read, on each namespace's own
   period: `chamber` roughly every second, `dry`/`wet` every five, per
-  `rig.yaml`'s overrides;
+  `rig-multi-sensor.yaml`'s overrides;
 - given a node directly (`rig.read(hum_sensors.dry, fresh=True)`), reads it
   regardless of when it was last due.
 

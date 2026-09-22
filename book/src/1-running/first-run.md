@@ -3,7 +3,7 @@
 *Start the runner, confirm the sensor reads, drive a pump by hand, set a setpoint, stop.*
 
 This walks through `sim.yaml` — no hardware needed — but every command
-below is identical against real hardware (`flyball-runner rig.yaml`
+below is identical against real hardware (`flyball-runner rig-multi-sensor.yaml`
 alone); only the addresses and the runner's boot line change.
 
 ## Start the runner
@@ -13,7 +13,7 @@ itself) serves it directly:
 
 ```
 cd examples/humidity
-uv run flyball-runner rig.yaml sim.yaml
+uv run flyball-runner rig-multi-sensor.yaml sim.yaml
 ```
 
 It binds to `127.0.0.1:8000` by default — loopback only — and, beside
@@ -31,12 +31,7 @@ flyball devices
 ```
 
 lists `hum_sensors` and `blender`. `flyball status` shows more: every
-signal's latest value, the controller, and anything waiting. This
-package's own thin client works the same way against its own API:
-
-```
-humidity status
-```
+signal's latest value, the controller, and anything waiting.
 
 ## Read a signal
 
@@ -53,13 +48,19 @@ of the last polled value.
 
 ## Drive a pump by hand
 
-`dry_flow` and `wet_flow` are a `together` pair — a demand naming one
-alone is refused, so a single-signal `flyball demand` won't do; put both
-in one demand instead. This package's `humidity` client wraps exactly
-that call (`PUT /api/devices/{name}/demand`):
+`flows.dry` and `flows.wet` are ordinary demands, independent of each
+other — set one at a time:
 
 ```
-humidity set blender dry_flow=0.2 wet_flow=0.2
+flyball demand blender.flows.dry 0.2
+flyball demand blender.flows.wet 0.2
+```
+
+or both at once with the `set_flows` command, if you want them to land
+together rather than as two separate writes:
+
+```
+flyball invoke blender set_flows dry=0.2 wet=0.2
 ```
 
 `blend_flow`, by contrast, isn't `together` with anything, so it takes a
@@ -72,7 +73,7 @@ flyball demand blender.blend_flow 1.2
 ## Set a target humidity
 
 `blender.humidity` is driven by the `blender.humidity` controller, marked
-`default: true` in `rig.yaml` — so `humidity` itself refuses a direct
+`default: true` in `rig-multi-sensor.yaml` — so `humidity` itself refuses a direct
 demand while the controller owns it (409: a signal a controller drives).
 Aim the controller instead. The simplest way is a one-step program (see
 [Humidity programs](programs.md) for the full vocabulary):
@@ -95,7 +96,7 @@ shows the chamber humidity moving towards it.
 ## Stop
 
 ```
-humidity stop
+flyball invoke blender stop
 ```
 
 calls the blender's `stop` command directly (`POST

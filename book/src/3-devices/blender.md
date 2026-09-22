@@ -86,7 +86,7 @@ actual output and the current supply humidities.
   `[0, 100]` and still rail if it's outside what the current dry/wet
   supply can reach.
 - `flows.dry`/`flows.wet` are each limited to their pump's `max_flow`
-  (`rig.yaml`: 2.0 L/min per line) — the limit *is* the `max_flows.dry`
+  (`rig-multi-sensor.yaml`: 2.0 L/min per line) — the limit *is* the `max_flows.dry`
   config signal, so the command form shows it and the rig clamps to it.
 - `efforts.dry`/`efforts.wet` are limited to `[0, 1]`.
 - `set_humidity(humidity, blend_flow)` blends to a target by hand, at a

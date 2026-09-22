@@ -19,5 +19,5 @@ numbers below are the families the design specifies, not verified orders.
 Anything that reads absolute humidity over I²C can replace the sensors
 (the earlier DHT22 needed an Arduino in between; the SHT45 does not), and
 any driver that meets the [pump page](pumps.md)'s three checks can replace
-the TB6612. Both are a change to `rig.yaml` and, for a new chip, a driver:
+the TB6612. Both are a change to `rig-multi-sensor.yaml` and, for a new chip, a driver:
 [the flyball book's Extending](https://bengineer42.github.io/flyball/latest/3-extending/).

@@ -20,8 +20,6 @@
 
 ::: humidity.blender
 
-::: humidity.cli
-
 ::: humidity.sim
 
 ::: humidity.units

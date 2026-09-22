@@ -1,7 +1,7 @@
 # Board and wiring
 
 Three things hang off the Pi's header: the sensors on the I²C bus, the
-motor driver on the two PWM pins, and power for the pumps. `rig.yaml`
+motor driver on the two PWM pins, and power for the pumps. `rig-multi-sensor.yaml`
 names them as the `i2c1` and `pwm0` links; the board profile
 (`flyball_linux/boards/rpi4.toml`, [Boards](https://bengineer42.github.io/flyball/latest/2-config/boards/)) says which pins
 those are.
@@ -17,7 +17,7 @@ those are.
 
 Three SHT4x breakouts share the one bus at three addresses -- `0x44` in the
 chamber, `0x45` on the dry line, `0x46` on the wet line -- which is what
-`sensors:` under `hum_sensors` in `rig.yaml` says. Boards with a
+`sensors:` under `hum_sensors` in `rig-multi-sensor.yaml` says. Boards with a
 Qwiic / STEMMA QT connector daisy-chain with no soldering; three distinct
 addresses need address-variant parts (or a multiplexer -- see the
 [bill of materials](bom.md)). Keep the leads short; I²C over a metre of
@@ -39,7 +39,7 @@ The TB6612FNG is a dual H-bridge: each channel takes a PWM on `PWMx` and a
 direction on `xIN1`/`xIN2`, and switches the motor supply `VM` to the pump.
 Pumps only ever run one way, so the direction pins are wired once. Channel
 A is `dry`, channel B `wet`, matching `dry: { channel: 0 }` and
-`wet: { channel: 1 }` in `rig.yaml`; swap the wires or the numbers, not both.
+`wet: { channel: 1 }` in `rig-multi-sensor.yaml`; swap the wires or the numbers, not both.
 
 ## Power
 
