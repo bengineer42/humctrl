@@ -30,6 +30,14 @@ Against real hardware (a Raspberry Pi, a TB6612 dual motor driver, SHT4x sensors
 uv run flyball-runner rig-multi-sensor.yaml
 ```
 
+Either way, that serves the API/WebSocket only -- no dashboard. `flyball run` (the Go CLI
+`install.sh` builds) wraps the same thing and can serve the dashboard too, embedded in the CLI
+binary itself, no separate UI build/install needed:
+
+```sh
+flyball run rig-multi-sensor.yaml --serve-ui :8000
+```
+
 See the [book](https://bengineer42.github.io/humctrl/) for hardware setup, wiring, first run,
 and the built-in humidity programs.
 

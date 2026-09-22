@@ -37,9 +37,13 @@ humidity = "humidity.configs"
 # flyball's examples/humidity, and must resolve standalone from a fresh clone, not just from
 # still happening to sit nested inside a flyball checkout. Bump the rev by hand when flyball
 # moves and this needs to follow.
-flyball = { git = "https://github.com/bengineer42/flyball", rev = "2178be949ab0c58f6239dc0a3e3bbb0eafd83199", subdirectory = "engine" }
-flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "2178be949ab0c58f6239dc0a3e3bbb0eafd83199", subdirectory = "extensions/linux" }
-flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "2178be949ab0c58f6239dc0a3e3bbb0eafd83199", subdirectory = "extensions/chips" }
+#
+# Currently pinned to `webui-embed`'s tip, not `dev` -- that branch has --serve-ui (needed for
+# `flyball run ... --serve-ui`, see README/book) and isn't merged yet. Move this to a `dev`
+# commit once it merges.
+flyball = { git = "https://github.com/bengineer42/flyball", rev = "1fcd36655d51b9b0e32652c74c74b5c7bc00feee", subdirectory = "engine" }
+flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "1fcd36655d51b9b0e32652c74c74b5c7bc00feee", subdirectory = "extensions/linux" }
+flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "1fcd36655d51b9b0e32652c74c74b5c7bc00feee", subdirectory = "extensions/chips" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]

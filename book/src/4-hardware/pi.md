@@ -52,25 +52,32 @@ After the reboot, `ls /dev/i2c-1 /sys/class/pwm/pwmchip0` shows both, and
 sudo apt install git python3
 curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/bengineer42/humctrl.git && cd humctrl
-uv sync                                  # flyball, flyball-linux[i2c] and this package, into .venv
-uv run flyball-runner rig-multi-sensor.yaml           # the real rig; `rig-multi-sensor.yaml sim.yaml` for the simulation
+./install.sh                             # uv, this package's deps, the flyball CLI, PWM/I2C (Pi detected)
+flyball run rig-multi-sensor.yaml --serve-ui :8000    # the real rig, dashboard included
 ```
 
+`--serve-ui ADDR` serves the dashboard (embedded in the `flyball` binary `install.sh` built) on
+`ADDR`, reverse-proxying `/api`/`/ws`/`/mcp` to the runner it starts -- `uv run flyball-runner
+rig-multi-sensor.yaml` (or `rig-multi-sensor.yaml sim.yaml` for the simulation) still works too,
+API/WebSocket only, no dashboard, if that's all you need.
+
 `flyball-linux` needs no compiled extensions for I²C and PWM (it talks to
-the kernel interfaces directly), so `uv sync` on the Pi is a few minutes,
-mostly downloading. A token, a sub-path, running under systemd: the
+the kernel interfaces directly), so `uv sync` (part of `install.sh`) on the Pi is a few
+minutes, mostly downloading. A token, a sub-path, running under systemd: the
 flyball book's [Starting a rig](https://bengineer42.github.io/flyball/latest/1-running/daemon/).
 
 ## nginx
 
-`scripts/setup-nginx.sh` reverse-proxies port 80 at the runner (installing
+`scripts/setup-nginx.sh` reverse-proxies port 80 at `flyball run --serve-ui` (installing
 nginx if needed), so the rig is reachable without naming its port:
 
 ```
-sudo ./scripts/setup-nginx.sh                                # runner on :8000, the default
+sudo ./scripts/setup-nginx.sh                                # --serve-ui on :8000, the default
 sudo ./scripts/setup-nginx.sh --port 8001 --server-name humidity.local
 ```
 
-The runner itself should stay bound to loopback only (its own default, no
-`--host` flag) -- nginx is then the only thing that needs a network route
-to it, not the runner directly.
+Point nginx at the *same* port `--serve-ui` is bound to, not the raw runner's port -- the raw
+`flyball-runner` process has no dashboard of its own to serve (that's what `--serve-ui` adds),
+so nginx proxying straight to it would show the same blank page this setup used to. The runner
+itself should stay bound to loopback only (its own default, no `--host` flag) -- nginx is then
+the only thing that needs a network route to it, not the runner directly.
