@@ -18,6 +18,11 @@ fi
 echo "==> uv sync"
 uv sync
 
+if grep -qs "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
+  echo "==> Raspberry Pi detected: enabling I2C/PWM (scripts/setup-pi-hardware.sh, needs sudo)"
+  sudo ./scripts/setup-pi-hardware.sh "$USER"
+fi
+
 if ! command -v go >/dev/null 2>&1; then
   echo "flyball CLI needs Go to build (https://go.dev/doc/install); skipping it -- re-run this script once Go is installed" >&2
   exit 0

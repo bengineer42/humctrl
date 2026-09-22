@@ -12,9 +12,10 @@ but is its own repo now, not a submodule.
 
 ## Running it
 
-`./install.sh` sets everything up: `uv` if it's missing, this repo's Python deps, and the
+`./install.sh` sets everything up: `uv` if it's missing, this repo's Python deps, the
 `flyball` CLI (built from the same flyball commit this repo is pinned to, straight to
-`~/.local/bin`).
+`~/.local/bin`), and, on a detected Raspberry Pi, I2C/PWM hardware access
+(`scripts/setup-pi-hardware.sh`, needs `sudo`).
 
 With no hardware — a simulated chamber and pumps:
 

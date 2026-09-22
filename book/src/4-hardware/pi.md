@@ -17,7 +17,8 @@ machine's.
 Two kernel features must be on: the I²C bus on the GPIO header (the
 sensors) and the hardware PWM channels (the pumps). `scripts/setup-pi-hardware.sh`
 in the repository does both, idempotently, with a backup of `config.txt`,
-and grants the named user access without root:
+and grants the named user access without root -- `install.sh` runs it for
+you automatically when it detects a Pi, or run it by hand:
 
 ```
 sudo ./scripts/setup-pi-hardware.sh $USER
@@ -25,12 +26,16 @@ sudo ./scripts/setup-pi-hardware.sh --verify     # check only, change nothing
 ```
 
 then reboot when it says so. By hand, it is `dtparam=i2c_arm=on` and
-`dtoverlay=pwm-2chan` in `/boot/firmware/config.txt`, a udev rule so
-`/sys/class/pwm` is writable by the user, and the user in the `i2c` group.
-`pwm-2chan` puts PWM0 on GPIO18 (header pin 12) and PWM1 on GPIO19 (pin
-35); `dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` moves them to
-GPIO12/13 if those pins suit the board better -- then change the board
-profile to match.
+`dtoverlay=pwm-2chan` in `/boot/firmware/config.txt`, the user in the `i2c`
+and `gpio` groups, and a udev rule (`/etc/udev/rules.d/90-pwm.rules`) that
+re-applies `root:gpio` group ownership to `/sys/class/pwm` on every PWM
+event -- an exported channel (`pwmchipN/pwmX`) is created root-owned fresh
+*every time it's exported*, not just at boot, so a one-off `chown` isn't
+enough; the rule catches each fresh export instead. `pwm-2chan` puts PWM0
+on GPIO18 (header pin 12) and PWM1 on GPIO19 (pin 35);
+`dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` moves them to GPIO12/13
+if those pins suit the board better -- then change the board profile to
+match.
 
 After the reboot, `ls /dev/i2c-1 /sys/class/pwm/pwmchip0` shows both, and
 `i2cdetect -y 1` lists the sensors at `44`, `45` and `46`.
