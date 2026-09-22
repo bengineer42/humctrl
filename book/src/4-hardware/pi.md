@@ -40,7 +40,7 @@ After the reboot, `ls /dev/i2c-1 /sys/class/pwm/pwmchip0` shows both, and
 ```
 sudo apt install git python3
 curl -LsSf https://astral.sh/uv/install.sh | sh
-git clone https://github.com/bengineer42/flyball.git && cd flyball/examples/humidity
+git clone https://github.com/bengineer42/humctrl.git && cd humctrl
 uv sync                                  # flyball, flyball-linux[i2c] and this package, into .venv
 uv run flyball-runner rig.yaml           # the real rig; `rig.yaml sim.yaml` for the simulation
 ```
