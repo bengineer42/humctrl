@@ -53,13 +53,17 @@ sudo apt install git python3
 curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/bengineer42/humctrl.git && cd humctrl
 ./install.sh                             # uv, this package's deps, the flyball CLI, PWM/I2C (Pi detected)
-flyball run rig-multi-sensor.yaml --serve-ui :8000    # the real rig, dashboard included
+flyball run rig-multi-sensor.yaml        # the real rig, dashboard included
 ```
 
-`--serve-ui ADDR` serves the dashboard (embedded in the `flyball` binary `install.sh` built) on
-`ADDR`, reverse-proxying `/api`/`/ws`/`/mcp` to the runner it starts -- `uv run flyball-runner
-rig-multi-sensor.yaml` (or `rig-multi-sensor.yaml sim.yaml` for the simulation) still works too,
-API/WebSocket only, no dashboard, if that's all you need.
+No flags needed: `blender.yaml` sets `runner.run.serve_ui`/`runner.run.uv`/`runner.port` in the
+rig file itself (shared by every rig file here via `extends`), so `flyball run` already knows to
+serve the dashboard on `:8000` -- reverse-proxying `/api`/`/ws`/`/mcp` to the runner it starts on
+`:8001` -- and to launch it via `uv run` (`flyball-runner` isn't on `$PATH` outside this
+project's own venv). Override with the equivalent flag when you need to (`--serve-ui ADDR`,
+`--uv`, `--port`) -- a CLI flag always wins over the rig file's own default. `uv run
+flyball-runner rig-multi-sensor.yaml` (or `rig-multi-sensor.yaml sim.yaml` for the simulation)
+still works too, API/WebSocket only, no dashboard, if that's all you need.
 
 `flyball-linux` needs no compiled extensions for I²C and PWM (it talks to
 the kernel interfaces directly), so `uv sync` (part of `install.sh`) on the Pi is a few

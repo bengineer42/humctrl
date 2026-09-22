@@ -6,6 +6,18 @@
 # supply lines' humidity instead of assuming dry 0 %RH / wet 100 %RH.
 #
 # Not a rig on its own: `flyball-runner blender.yaml` has no sensor to regulate from.
+#
+# runner.port is moved off flyball's default (8000) so `flyball run`'s embedded dashboard
+# (runner.run.serve_ui, below) can sit on :8000 instead without a bind collision -- see
+# book/src/2-config/runner.md in the flyball repo for what runner.run's keys do; they're
+# Go-CLI-only, flyball-runner itself never reads them.
+
+runner:
+  port: 8001
+  run:
+    serve_ui: ":8000"
+    uv: true
+    port: "8001"
 
 links:
   pwm0: { tag: pwm, chip: 0 }

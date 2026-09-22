@@ -35,8 +35,14 @@ Either way, that serves the API/WebSocket only -- no dashboard. `flyball run` (t
 binary itself, no separate UI build/install needed:
 
 ```sh
-flyball run rig-multi-sensor.yaml --serve-ui :8000
+flyball run rig-multi-sensor.yaml
 ```
+
+No flags needed -- `blender.yaml` (shared by every rig file here) sets `runner.run.serve_ui`/
+`runner.run.uv` in the rig file itself, so `flyball run` already knows to serve the dashboard on
+`:8000` and launch via `uv run` (`flyball-runner` isn't on `$PATH` outside a project's own venv).
+Override any of it with the equivalent flag when you need to (`--serve-ui`, `--uv`, `--port`) --
+a CLI flag always wins over the rig file's own default.
 
 See the [book](https://bengineer42.github.io/humctrl/) for hardware setup, wiring, first run,
 and the built-in humidity programs.
