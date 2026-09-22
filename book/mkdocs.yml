@@ -4,7 +4,8 @@ site_author: Ben Laurence
 docs_dir: src
 site_dir: ../build/book
 strict: true
-repo_url: https://github.com/bengineer42/flyball
+site_url: https://bengineer42.github.io/humctrl/
+repo_url: https://github.com/bengineer42/humctrl
 repo_name: ""          # the logo alone, no text
 
 theme:
@@ -26,12 +27,6 @@ theme:
       scheme: slate
       toggle: { icon: material/brightness-4, name: Light }
 
-# Versions: mike deploys each into the gh-pages branch; the theme shows a selector.
-extra:
-  version:
-    provider: mike
-    default: latest
-
 markdown_extensions:
   - admonition
   - tables
@@ -47,7 +42,7 @@ plugins:
       default_handler: python
       handlers:
         python:
-          paths: [../src, ../../../engine/src]
+          paths: [../src]
           options:
             docstring_style: google
             docstring_options: { warn_unknown_params: false, warn_missing_types: false }
