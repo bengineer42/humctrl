@@ -3,7 +3,9 @@
 `HumidityChamber` mixes a dry and a wet air stream (`dry_rh`, `wet_rh`,
 their own maximum flows) into a chamber of `volume_l`, leaking towards
 `ambient_rh` at `exchange_per_min`; the chamber's sensor lags the true
-value by `sensor_tau_s`. It is two things at once:
+value by `sensor_tau_s`, and the mixing equation itself lags the commanded
+flows by `dead_time_s` -- transport delay, downstream of nothing (the sensor
+lag is separate and comes after it). It is two things at once:
 
 * a `MultiPlant` (`flyball_sim.plant`) -- `sim_daq` (`hum_sensors`) reads
   its six named outputs, one per leaf the real `hum_sensors` declares
@@ -30,8 +32,9 @@ the (drifting) supply humidities actually delivered.
 from __future__ import annotations
 
 import random
+from collections import deque
 from math import pi, sin
-from typing import Literal
+from typing import Any, Literal
 
 from flyball.foundation.config import Config
 from flyball.foundation.typing import NonNegative, Positive
@@ -90,6 +93,7 @@ class HumidityChamber:
         initial_rh: float,
         temperature_c: float,
         sensor_tau_s: float,
+        dead_time_s: float,
         noise_rh: float,
         supply_noise_rh: float,
         supply_drift_rh: float,
@@ -112,6 +116,7 @@ class HumidityChamber:
         self._exchange_per_min = exchange_per_min
         self._temperature_c = temperature_c
         self._sensor_tau_s = sensor_tau_s
+        self._dead_time_s = dead_time_s
         self._noise_rh = noise_rh
         self._supply_noise_rh = supply_noise_rh
         self._supply_drift_rh = supply_drift_rh
@@ -123,6 +128,8 @@ class HumidityChamber:
         self._h = initial_rh
         self._sensor = initial_rh
         self._last_ns: int | None = None
+        self._flow_history: deque[tuple[int, float, float]] = deque()
+        """Commanded `(time_ns, dry_flow, wet_flow)`, oldest first; feeds `_delayed_flows`."""
         self._duty: dict[int, float] = {}
         self._enabled: dict[int, bool] = {}
         self._random = random.Random(seed)
@@ -208,7 +215,8 @@ class HumidityChamber:
     # region The physics
 
     def _euler(self, dt_s: float, t_ns: int) -> None:
-        dry_flow, wet_flow = self._flows
+        self._flow_history.append((t_ns, *self._flows))
+        dry_flow, wet_flow = self._delayed_flows(t_ns)
         total = dry_flow + wet_flow
         dry_rh, wet_rh = self._supply_rh(t_ns)
         h_in = (dry_flow * dry_rh + wet_flow * wet_rh) / total if total > 0 else self._h
@@ -220,6 +228,26 @@ class HumidityChamber:
             self._sensor += (self._h - self._sensor) * dt_s / self._sensor_tau_s
         else:
             self._sensor = self._h
+
+    def _delayed_flows(self, time_ns: int) -> tuple[float, float]:
+        """The commanded dry/wet flows as they stood `dead_time_s` ago.
+
+        Transport delay: `configure`/`enable` change what is *in the pipe*, not what is
+        reaching the chamber right now -- unlike `sensor_tau_s`, which lags the *reading*.
+        Looks up the newest history entry at or before `time_ns - dead_time_s`, draining
+        anything older (time only moves forward, so an older entry can never be wanted
+        again). Startup, before any command is that old yet: returns `(0.0, 0.0)`, the same
+        as if the line had never been commanded -- the dead-time pipe has nothing in it.
+        """
+        if self._dead_time_s <= 0:
+            return self._flows
+        target_ns = time_ns - round(self._dead_time_s * 1e9)
+        history = self._flow_history
+        if not history or history[0][0] > target_ns:
+            return (0.0, 0.0)
+        while len(history) > 1 and history[1][0] <= target_ns:
+            history.popleft()
+        return history[0][1], history[0][2]
 
     def _drift(self, time_ns: int, amplitude: float, phase: float) -> float:
         if amplitude <= 0:
@@ -283,6 +311,10 @@ class HumidityChamberConfig(Config[HumidityChamber], tag="sim_humidity_chamber")
     """Every temperature output's steady baseline, °C."""
     sensor_tau_s: Positive = 3.0
     """The chamber sensor's own first-order lag, seconds."""
+    dead_time_s: NonNegative = 0.0
+    """Transport delay: how long a `configure`/`enable` change takes to reach the mixing
+    equation, seconds. Not `sensor_tau_s` -- that lags the *reading*, this delays the
+    *effect*. Default 0.0 (no delay), matching every existing rig file."""
     noise_rh: NonNegative = 0.3
     """Gaussian noise on the chamber's humidity reading, %RH."""
     supply_noise_rh: NonNegative = 0.15
@@ -315,6 +347,7 @@ class HumidityChamberConfig(Config[HumidityChamber], tag="sim_humidity_chamber")
             initial_rh=self.initial_rh,
             temperature_c=self.temperature_c,
             sensor_tau_s=self.sensor_tau_s,
+            dead_time_s=self.dead_time_s,
             noise_rh=self.noise_rh,
             supply_noise_rh=self.supply_noise_rh,
             supply_drift_rh=self.supply_drift_rh,
@@ -324,3 +357,51 @@ class HumidityChamberConfig(Config[HumidityChamber], tag="sim_humidity_chamber")
             flow_warming_c_per_lpm=self.flow_warming_c_per_lpm,
             seed=self.seed,
         )
+
+    def retune(self, plant: Any) -> None:
+        """Apply this config's parameters to a running chamber (`sim_set_plant`).
+
+        Its state -- current humidity (`_h`), sensor reading (`_sensor`), the
+        commanded-flow history the dead time reads from, and the PWM duty/enable a
+        driver already set -- is left untouched, exactly as the furnace's `retune`
+        leaves its temperatures alone: a simulation keeps running through the change,
+        as a real rig would. `initial_rh` and `seed` are start-up-only and are not
+        reapplied, again following the furnace's precedent for `initial_c`.
+
+        Raises:
+            ValueError: `wet_rh` would no longer be greater than `dry_rh`. Unlike a
+                plain parameter, the blend direction is structural here (the mixing
+                equation and `feedforward`/`inverse_feedforward` assume dry-to-wet is a
+                span with a fixed sign) -- the equivalent of the furnace refusing a
+                change of zone count, or `PlantConfig.retune` refusing a change of model.
+        """
+        if not isinstance(plant, HumidityChamber):
+            raise ValueError(f"not a HumidityChamber: {plant!r}")
+        if self.wet_rh <= self.dry_rh:
+            raise ValueError(
+                f"wet_rh ({self.wet_rh}) must stay greater than dry_rh ({self.dry_rh}): "
+                "the blend direction cannot change while the chamber runs"
+            )
+        fresh = self.build()
+        for attr in (
+            "_volume_l",
+            "_dry_flow_l_per_min",
+            "_wet_flow_l_per_min",
+            "_flow_l_per_min",
+            "_dry_rh",
+            "_wet_rh",
+            "_ambient_rh",
+            "_exchange_per_min",
+            "_temperature_c",
+            "_sensor_tau_s",
+            "_dead_time_s",
+            "_noise_rh",
+            "_supply_noise_rh",
+            "_supply_drift_rh",
+            "_supply_drift_period_s",
+            "_temperature_noise_c",
+            "_temperature_drift_c",
+            "_flow_warming_c_per_lpm",
+            "_max_step_s",
+        ):
+            setattr(plant, attr, getattr(fresh, attr))

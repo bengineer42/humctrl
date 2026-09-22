@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -206,3 +207,88 @@ def test_temperatures_drift_around_the_baseline_and_the_chamber_warms_with_flow(
         expected_chamber + 2.0 * 4.0  # flow_warming_c_per_lpm * (dry + wet) flow
     )
     assert driven.output("dry_temperature") == pytest.approx(expected_dry)  # unaffected
+
+
+def test_dead_time_delays_the_mixing_effect_not_the_reading() -> None:
+    """A `configure`/`enable` change must sit in the pipe for `dead_time_s` before the
+    mixing equation sees it -- unlike `sensor_tau_s`, which lags the reading of an
+    already-arrived change. Drive a step at t=0 with `dead_time_s=1.0`: the humidity must
+    not move at all before t=1.0, then must be clearly moving once t is past it."""
+    common: dict[str, Any] = dict(
+        dry_rh=10.0,
+        wet_rh=90.0,
+        dry_flow_l_per_min=2.0,
+        wet_flow_l_per_min=2.0,
+        volume_l=1.0,
+        initial_rh=10.0,
+        exchange_per_min=0.0,
+        sensor_tau_s=0.05,
+        dead_time_s=1.0,
+        noise_rh=0.0,
+        supply_noise_rh=0.0,
+        supply_drift_rh=0.0,
+        temperature_noise_c=0.0,
+        temperature_drift_c=0.0,
+    )
+    plant = HumidityChamberConfig(**common).build()
+    plant.advance(0)
+    h0 = plant.output("chamber_humidity")
+    _drive(plant, WET_CHANNEL, 1.0)  # commanded now; must not reach the mix until t=1.0
+
+    plant.advance(round(0.95 * 1e9))
+    assert plant.output("chamber_humidity") == pytest.approx(h0, abs=1e-9)  # still nothing
+
+    plant.advance(round(1.5 * 1e9))
+    assert plant.output("chamber_humidity") > h0 + 1.0  # now clearly moving
+
+
+def test_dead_time_zero_is_the_default_and_behaves_as_before() -> None:
+    assert HumidityChamberConfig().dead_time_s == 0.0
+
+
+def test_retune_changes_a_parameter_on_a_running_chamber_without_resetting_its_state() -> None:
+    plant = HumidityChamberConfig(sensor_tau_s=0.05, noise_rh=0.0).build()
+    _drive(plant, WET_CHANNEL, 0.5)
+    _settle(plant, 5.0)  # mid-integration: humidity has moved off initial_rh
+    h_before = plant.output("chamber_humidity")
+
+    updated = HumidityChamberConfig(
+        sensor_tau_s=0.05, noise_rh=0.0, dry_flow_l_per_min=9.0, dead_time_s=2.0
+    )
+    updated.retune(plant)
+
+    # the new parameters took:
+    assert plant._dry_flow_l_per_min == pytest.approx(9.0)
+    assert plant._dead_time_s == pytest.approx(2.0)
+    # ...but the chamber's own state -- humidity, and the live PWM drive -- did not reset:
+    assert plant.output("chamber_humidity") == pytest.approx(h_before)
+    assert plant._duty[WET_CHANNEL] == pytest.approx(0.5)
+    assert plant._enabled[WET_CHANNEL] is True
+
+
+def test_retune_refuses_a_plant_it_did_not_build() -> None:
+    with pytest.raises(ValueError, match="not a HumidityChamber"):
+        HumidityChamberConfig().retune(object())
+
+
+def test_retune_refuses_wet_rh_not_greater_than_dry_rh() -> None:
+    plant = HumidityChamberConfig(dry_rh=10.0, wet_rh=90.0).build()
+    with pytest.raises(ValueError, match="blend direction"):
+        HumidityChamberConfig(dry_rh=90.0, wet_rh=10.0).retune(plant)
+
+
+def test_the_chamber_counts_as_a_simulated_plant_in_simulation_plants() -> None:
+    """The essential wiring for `sim_set_plant`/`sim_reset_plant`: `Simulation.plants`
+    counts a link when its config can `retune` what it built (see its docstring)."""
+    import flyball_linux.configs  # noqa: F401  (registers i2c/pwm tags)
+    from flyball.runtime.config import load_rig_config
+    from flyball_sim.simulation import Simulation
+
+    import humidity.configs  # noqa: F401  (registers sim_humidity_chamber, dual_pump_blender)
+
+    root = Path(__file__).resolve().parents[1]
+    config = load_rig_config([root / "rig-multi-sensor.yaml", root / "sim.yaml"])
+    rig = config.build(start=False)
+    simulation = Simulation(rig, config)
+    assert "chamber" in simulation.plants
+    assert isinstance(simulation.plants["chamber"], HumidityChamber)
