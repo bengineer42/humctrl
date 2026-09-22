@@ -37,12 +37,15 @@ as the new plateau. Against this rig:
   the working range with a size of 10–15 %RH is a reasonable start.
 - **`window`**: must exceed the plant's dead time, or the flat stretch
   right after the step reads as the plateau and the fit never sees the
-  response. `sim.yaml`'s `sim_humidity_chamber` plant is a pure first-order
-  lag (`tau_s: 45.0`) with **no dead time term at all** — useful for
+  response. `sim.yaml`'s `sim_humidity_chamber` plant has a `dead_time_s`
+  field (see [Configuration: the plant](../2-config/index.md#the-plant-sim_humidity_chamber)),
+  but it defaults to `0.0` and `sim.yaml` does not set it — as shipped, the
+  plant is a pure first-order lag with **no dead time**, useful for
   exercising the fit code, not for sizing `window` against real transport
   delay. On real hardware, expect dead time from the tubing between the
   blend point and the chamber, and from the sensor's own response; size
-  `window` generously until a real run confirms it.
+  `window` generously until a real run confirms it, or set `dead_time_s`
+  on the sim plant (`sim_set_plant`) to rehearse against a specific value.
 - **`band`**: above the chamber sensor's noise (`sim.yaml`'s plant adds
   ±0.3 %RH Gaussian noise to the chamber reading only — the real SHT4x's
   own noise floor is unmeasured), well below `size`.

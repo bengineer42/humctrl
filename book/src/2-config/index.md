@@ -123,6 +123,8 @@ links:
     initial_rh: 40.0               # %RH
     temperature_c: 21.0            # °C, every temperature's steady baseline
     sensor_tau_s: 3.0              # s, the chamber sensor's own lag
+    dead_time_s: 0.0               # s, transport delay -- see below; 0 = off, matches every
+                                    # rig file until set otherwise
     noise_rh: 0.3                  # %RH, Gaussian, chamber reading only
     supply_noise_rh: 0.15          # %RH, Gaussian, dry/wet readings each sample
     supply_drift_rh: 2.0           # ± %RH, slow sinusoidal supply wander (wet: 88-92)
@@ -213,6 +215,25 @@ observes it through `bound`, same as a real sensor's drift would), not
 just the display. Every temperature drifts the same slow way around
 `temperature_c` with its own noise (`temperature_noise_c`), the chamber's
 also warming a little under total flow (`flow_warming_c_per_lpm`).
+
+`dead_time_s` is a separate thing from `sensor_tau_s`: it is transport
+delay, the time a `configure`/`enable` change from `blender` takes to
+reach the mixing equation, not the time the *reading* takes to catch up
+with the mixing equation's own output (that is `sensor_tau_s`). The real
+rig has both — the blended air takes time to travel from the valves to
+the chamber, and the chamber's own sensor then lags what arrives. Default
+`0.0`, so every rig file predating it behaves exactly as before; set it to
+match a step response fitted on hardware (a real rig measured
+`gain ≈ 1.13`, `tau ≈ 11.5 s`, `dead_time ≈ 8.7 s`, at `blend_flow: 1.0` —
+your own rig's numbers will differ with tubing length and flow).
+
+The chamber is a plant like `sim_plant`/`sim_furnace`: `sim_set_plant`
+(the `/api/sim` route, or `flyball sim set`) can retune any of its
+physical parameters — including `dead_time_s` — on a running rig, without
+resetting its current humidity, sensor reading or in-flight PWM drive.
+The one thing it refuses is `wet_rh` at or below `dry_rh`: the blend
+direction is structural, not a tunable, so that combination raises
+instead of silently breaking the mixing arithmetic.
 
 ## Tunings
 
