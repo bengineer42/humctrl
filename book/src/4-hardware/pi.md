@@ -27,15 +27,21 @@ sudo ./scripts/setup-pi-hardware.sh --verify     # check only, change nothing
 
 then reboot when it says so. By hand, it is `dtparam=i2c_arm=on` and
 `dtoverlay=pwm-2chan` in `/boot/firmware/config.txt`, the user in the `i2c`
-and `gpio` groups, and a udev rule (`/etc/udev/rules.d/90-pwm.rules`) that
-re-applies `root:gpio` group ownership to `/sys/class/pwm` on every PWM
-event -- an exported channel (`pwmchipN/pwmX`) is created root-owned fresh
-*every time it's exported*, not just at boot, so a one-off `chown` isn't
-enough; the rule catches each fresh export instead. `pwm-2chan` puts PWM0
-on GPIO18 (header pin 12) and PWM1 on GPIO19 (pin 35);
-`dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` moves them to GPIO12/13
-if those pins suit the board better -- then change the board profile to
-match.
+and `gpio` groups, and permissions on the two PWM channels this rig uses
+(`pwmchip0/pwm0`, `pwm1`). An exported channel is created root-owned fresh
+*every time it's exported*, not just at boot, and this rig exports and
+writes to a channel back to back with no delay -- too fast for a udev rule
+alone to win the race reliably (confirmed live: a udev rule was tried
+first and lost that race in practice). Fixed deterministically instead: the
+script pre-exports and `chown`s both channels itself, and installs a
+`flyball-pwm.service` systemd oneshot that repeats that on every boot,
+before the rig ever runs -- by the time it asks for a channel, there's
+nothing left to export. A udev rule (`/etc/udev/rules.d/90-pwm.rules`)
+still gets installed too, as a defence-in-depth catch-all for anything
+else that touches a channel. `pwm-2chan` puts PWM0 on GPIO18 (header pin
+12) and PWM1 on GPIO19 (pin 35); `dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4`
+moves them to GPIO12/13 if those pins suit the board better -- then change
+the board profile to match.
 
 After the reboot, `ls /dev/i2c-1 /sys/class/pwm/pwmchip0` shows both, and
 `i2cdetect -y 1` lists the sensors at `44`, `45` and `46`.
@@ -52,5 +58,19 @@ uv run flyball-runner rig-multi-sensor.yaml           # the real rig; `rig-multi
 
 `flyball-linux` needs no compiled extensions for I²C and PWM (it talks to
 the kernel interfaces directly), so `uv sync` on the Pi is a few minutes,
-mostly downloading. Serving it on the network, a token, a sub-path, running
-under systemd: the flyball book's [Starting a rig](https://bengineer42.github.io/flyball/latest/1-running/daemon/).
+mostly downloading. A token, a sub-path, running under systemd: the
+flyball book's [Starting a rig](https://bengineer42.github.io/flyball/latest/1-running/daemon/).
+
+## nginx
+
+`scripts/setup-nginx.sh` reverse-proxies port 80 at the runner (installing
+nginx if needed), so the rig is reachable without naming its port:
+
+```
+sudo ./scripts/setup-nginx.sh                                # runner on :8000, the default
+sudo ./scripts/setup-nginx.sh --port 8001 --server-name humidity.local
+```
+
+The runner itself should stay bound to loopback only (its own default, no
+`--host` flag) -- nginx is then the only thing that needs a network route
+to it, not the runner directly.
