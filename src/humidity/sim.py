@@ -34,7 +34,7 @@ from __future__ import annotations
 import random
 from collections import deque
 from math import pi, sin
-from typing import Literal
+from typing import Any, Literal
 
 from flyball.foundation.config import Config
 from flyball.foundation.typing import NonNegative, Positive
@@ -357,3 +357,51 @@ class HumidityChamberConfig(Config[HumidityChamber], tag="sim_humidity_chamber")
             flow_warming_c_per_lpm=self.flow_warming_c_per_lpm,
             seed=self.seed,
         )
+
+    def retune(self, plant: Any) -> None:
+        """Apply this config's parameters to a running chamber (`sim_set_plant`).
+
+        Its state -- current humidity (`_h`), sensor reading (`_sensor`), the
+        commanded-flow history the dead time reads from, and the PWM duty/enable a
+        driver already set -- is left untouched, exactly as the furnace's `retune`
+        leaves its temperatures alone: a simulation keeps running through the change,
+        as a real rig would. `initial_rh` and `seed` are start-up-only and are not
+        reapplied, again following the furnace's precedent for `initial_c`.
+
+        Raises:
+            ValueError: `wet_rh` would no longer be greater than `dry_rh`. Unlike a
+                plain parameter, the blend direction is structural here (the mixing
+                equation and `feedforward`/`inverse_feedforward` assume dry-to-wet is a
+                span with a fixed sign) -- the equivalent of the furnace refusing a
+                change of zone count, or `PlantConfig.retune` refusing a change of model.
+        """
+        if not isinstance(plant, HumidityChamber):
+            raise ValueError(f"not a HumidityChamber: {plant!r}")
+        if self.wet_rh <= self.dry_rh:
+            raise ValueError(
+                f"wet_rh ({self.wet_rh}) must stay greater than dry_rh ({self.dry_rh}): "
+                "the blend direction cannot change while the chamber runs"
+            )
+        fresh = self.build()
+        for attr in (
+            "_volume_l",
+            "_dry_flow_l_per_min",
+            "_wet_flow_l_per_min",
+            "_flow_l_per_min",
+            "_dry_rh",
+            "_wet_rh",
+            "_ambient_rh",
+            "_exchange_per_min",
+            "_temperature_c",
+            "_sensor_tau_s",
+            "_dead_time_s",
+            "_noise_rh",
+            "_supply_noise_rh",
+            "_supply_drift_rh",
+            "_supply_drift_period_s",
+            "_temperature_noise_c",
+            "_temperature_drift_c",
+            "_flow_warming_c_per_lpm",
+            "_max_step_s",
+        ):
+            setattr(plant, attr, getattr(fresh, attr))

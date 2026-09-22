@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -243,3 +244,51 @@ def test_dead_time_delays_the_mixing_effect_not_the_reading() -> None:
 
 def test_dead_time_zero_is_the_default_and_behaves_as_before() -> None:
     assert HumidityChamberConfig().dead_time_s == 0.0
+
+
+def test_retune_changes_a_parameter_on_a_running_chamber_without_resetting_its_state() -> None:
+    plant = HumidityChamberConfig(sensor_tau_s=0.05, noise_rh=0.0).build()
+    _drive(plant, WET_CHANNEL, 0.5)
+    _settle(plant, 5.0)  # mid-integration: humidity has moved off initial_rh
+    h_before = plant.output("chamber_humidity")
+
+    updated = HumidityChamberConfig(
+        sensor_tau_s=0.05, noise_rh=0.0, dry_flow_l_per_min=9.0, dead_time_s=2.0
+    )
+    updated.retune(plant)
+
+    # the new parameters took:
+    assert plant._dry_flow_l_per_min == pytest.approx(9.0)
+    assert plant._dead_time_s == pytest.approx(2.0)
+    # ...but the chamber's own state -- humidity, and the live PWM drive -- did not reset:
+    assert plant.output("chamber_humidity") == pytest.approx(h_before)
+    assert plant._duty[WET_CHANNEL] == pytest.approx(0.5)
+    assert plant._enabled[WET_CHANNEL] is True
+
+
+def test_retune_refuses_a_plant_it_did_not_build() -> None:
+    with pytest.raises(ValueError, match="not a HumidityChamber"):
+        HumidityChamberConfig().retune(object())
+
+
+def test_retune_refuses_wet_rh_not_greater_than_dry_rh() -> None:
+    plant = HumidityChamberConfig(dry_rh=10.0, wet_rh=90.0).build()
+    with pytest.raises(ValueError, match="blend direction"):
+        HumidityChamberConfig(dry_rh=90.0, wet_rh=10.0).retune(plant)
+
+
+def test_the_chamber_counts_as_a_simulated_plant_in_simulation_plants() -> None:
+    """The essential wiring for `sim_set_plant`/`sim_reset_plant`: `Simulation.plants`
+    counts a link when its config can `retune` what it built (see its docstring)."""
+    import flyball_linux.configs  # noqa: F401  (registers i2c/pwm tags)
+    from flyball.runtime.config import load_rig_config
+    from flyball_sim.simulation import Simulation
+
+    import humidity.configs  # noqa: F401  (registers sim_humidity_chamber, dual_pump_blender)
+
+    root = Path(__file__).resolve().parents[1]
+    config = load_rig_config([root / "rig-multi-sensor.yaml", root / "sim.yaml"])
+    rig = config.build(start=False)
+    simulation = Simulation(rig, config)
+    assert "chamber" in simulation.plants
+    assert isinstance(simulation.plants["chamber"], HumidityChamber)
