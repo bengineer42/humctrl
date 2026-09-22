@@ -36,9 +36,13 @@ humidity = "humidity.configs"
 humidity = "humidity.cli:main"
 
 [tool.uv.sources]
-flyball = { path = "../../engine", editable = true }
-flyball-linux = { path = "../../extensions/linux", editable = true }
-flyball-chips = { path = "../../extensions/chips", editable = true }
+# Pinned to a commit, not the local path: this repo (humctrl) is its own git repo, split out of
+# flyball's examples/humidity, and must resolve standalone from a fresh clone, not just from
+# still happening to sit nested inside a flyball checkout. Bump the rev by hand when flyball
+# moves and this needs to follow.
+flyball = { git = "https://github.com/bengineer42/flyball", rev = "f0ca0383c8570fa6c3eff7b39d9344b6b27a393a", subdirectory = "engine" }
+flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "f0ca0383c8570fa6c3eff7b39d9344b6b27a393a", subdirectory = "extensions/linux" }
+flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "f0ca0383c8570fa6c3eff7b39d9344b6b27a393a", subdirectory = "extensions/chips" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]

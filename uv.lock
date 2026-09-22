@@ -226,7 +226,8 @@ wheels = [
 
 [[package]]
 name = "flyball"
-source = { editable = "../../engine" }
+version = "0.1.0"
+source = { git = "https://github.com/bengineer42/flyball?subdirectory=engine&rev=f0ca0383c8570fa6c3eff7b39d9344b6b27a393a#f0ca0383c8570fa6c3eff7b39d9344b6b27a393a" }
 dependencies = [
     { name = "pydantic" },
     { name = "tomli-w" },
@@ -243,78 +244,19 @@ web = [
     { name = "websockets" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", marker = "extra == 'all'", specifier = ">=0.115" },
-    { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.115" },
-    { name = "flyball-sim", marker = "extra == 'all'", editable = "../../sim" },
-    { name = "flyball-sim", marker = "extra == 'web'", editable = "../../sim" },
-    { name = "httpx", marker = "extra == 'all'", specifier = ">=0.27" },
-    { name = "httpx", marker = "extra == 'cli'", specifier = ">=0.27" },
-    { name = "httpx", marker = "extra == 'mcp'", specifier = ">=0.27" },
-    { name = "httpx", marker = "extra == 'web'", specifier = ">=0.27" },
-    { name = "mcp", marker = "extra == 'all'", specifier = ">=1.12" },
-    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.12" },
-    { name = "mcp", marker = "extra == 'web'", specifier = ">=1.12" },
-    { name = "pydantic", specifier = ">=2.9" },
-    { name = "pyyaml", marker = "extra == 'all'", specifier = ">=6" },
-    { name = "pyyaml", marker = "extra == 'cli'", specifier = ">=6" },
-    { name = "pyyaml", marker = "extra == 'mcp'", specifier = ">=6" },
-    { name = "pyyaml", marker = "extra == 'web'", specifier = ">=6" },
-    { name = "tomli-w", specifier = ">=1.0" },
-    { name = "uvicorn", extras = ["standard"], marker = "extra == 'all'", specifier = ">=0.32" },
-    { name = "uvicorn", extras = ["standard"], marker = "extra == 'web'", specifier = ">=0.32" },
-    { name = "websockets", marker = "extra == 'all'", specifier = ">=13" },
-    { name = "websockets", marker = "extra == 'cli'", specifier = ">=13" },
-    { name = "websockets", marker = "extra == 'mcp'", specifier = ">=13" },
-    { name = "websockets", marker = "extra == 'web'", specifier = ">=13" },
-]
-provides-extras = ["all", "cli", "mcp", "web"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "flyball-modbus", editable = "../../extensions/modbus" },
-    { name = "flyball-sim", editable = "../../sim" },
-    { name = "flyball-visa", editable = "../../extensions/visa" },
-    { name = "furnace", editable = "../furnace" },
-    { name = "import-linter", specifier = ">=2.1" },
-    { name = "ipykernel", specifier = ">=7.3.0" },
-    { name = "mypy", specifier = ">=1.13" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "ruff", specifier = ">=0.8" },
-]
-docs = [
-    { name = "griffe-pydantic", specifier = ">=1.0" },
-    { name = "mkdocs-material", specifier = ">=9.5" },
-    { name = "mkdocstrings", extras = ["python"], specifier = ">=0.26" },
-]
-
 [[package]]
 name = "flyball-chips"
 version = "0.1.0"
-source = { editable = "../../extensions/chips" }
+source = { git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Fchips&rev=f0ca0383c8570fa6c3eff7b39d9344b6b27a393a#f0ca0383c8570fa6c3eff7b39d9344b6b27a393a" }
 dependencies = [
     { name = "flyball" },
     { name = "flyball-sim" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "flyball", editable = "../../engine" },
-    { name = "flyball-sim", editable = "../../sim" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "ruff", specifier = ">=0.8" },
-]
-
 [[package]]
 name = "flyball-linux"
 version = "0.1.0"
-source = { editable = "../../extensions/linux" }
+source = { git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Flinux&rev=f0ca0383c8570fa6c3eff7b39d9344b6b27a393a#f0ca0383c8570fa6c3eff7b39d9344b6b27a393a" }
 dependencies = [
     { name = "flyball" },
     { name = "flyball-chips" },
@@ -326,41 +268,12 @@ i2c = [
     { name = "smbus2" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "flyball", editable = "../../engine" },
-    { name = "flyball-chips", editable = "../../extensions/chips" },
-    { name = "flyball-linux", extras = ["i2c", "spi", "gpio", "serial"], marker = "extra == 'all'" },
-    { name = "flyball-sim", editable = "../../sim" },
-    { name = "gpiod", marker = "extra == 'gpio'", specifier = ">=2.1" },
-    { name = "pyserial", marker = "extra == 'serial'", specifier = ">=3.5" },
-    { name = "smbus2", marker = "extra == 'i2c'", specifier = ">=0.4" },
-    { name = "spidev", marker = "extra == 'spi'", specifier = ">=3.6" },
-]
-provides-extras = ["i2c", "spi", "gpio", "serial", "all"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pyyaml", specifier = ">=6" },
-    { name = "ruff", specifier = ">=0.8" },
-]
-
 [[package]]
 name = "flyball-sim"
 version = "0.1.0"
-source = { editable = "../../sim" }
+source = { git = "https://github.com/bengineer42/flyball?subdirectory=sim&rev=f0ca0383c8570fa6c3eff7b39d9344b6b27a393a#f0ca0383c8570fa6c3eff7b39d9344b6b27a393a" }
 dependencies = [
     { name = "flyball" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "flyball", editable = "../../engine" }]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "ruff", specifier = ">=0.8" },
 ]
 
 [[package]]
@@ -498,9 +411,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "flyball", extras = ["web"], editable = "../../engine" },
-    { name = "flyball-chips", editable = "../../extensions/chips" },
-    { name = "flyball-linux", extras = ["i2c"], editable = "../../extensions/linux" },
+    { name = "flyball", extras = ["web"], git = "https://github.com/bengineer42/flyball?subdirectory=engine&rev=f0ca0383c8570fa6c3eff7b39d9344b6b27a393a" },
+    { name = "flyball-chips", git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Fchips&rev=f0ca0383c8570fa6c3eff7b39d9344b6b27a393a" },
+    { name = "flyball-linux", extras = ["i2c"], git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Flinux&rev=f0ca0383c8570fa6c3eff7b39d9344b6b27a393a" },
     { name = "httpx", marker = "extra == 'cli'", specifier = ">=0.27" },
 ]
 provides-extras = ["cli"]
