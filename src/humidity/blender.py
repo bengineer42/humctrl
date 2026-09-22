@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from flyball.foundation.device import (
+    Access,
     Committable,
     Demand,
     DriverConfig,
@@ -129,10 +130,18 @@ class DualPumpBlender(Committable):
 
     humidity = Demand("humidity", "Target humidity", HUMIDITY, limits=(dry_supply, wet_supply))
     """Clamped to what the lines can mix: the supply humidities, as they read now."""
-    dry_flow = flows.demand(DRY, "Dry pump flow", FLOW, limits=(0.0, dry_max_flow))
-    wet_flow = flows.demand(WET, "Wet pump flow", FLOW, limits=(0.0, wet_max_flow))
-    dry_effort = efforts.demand(DRY, "Dry pump effort", EFFORT, limits=(0.0, 1.0))
-    wet_effort = efforts.demand(WET, "Wet pump effort", EFFORT, limits=(0.0, 1.0))
+    # Readbacks only: `set_flows`/`set_efforts` are the only way to move these -- see
+    # `commit`, which never looks at their `.pending`. Not `access=Access.RPW`'s default for
+    # a Demand, so the generic signal editor does not offer a direct write that would be
+    # silently accepted and never reach the pumps.
+    dry_flow = flows.demand(
+        DRY, "Dry pump flow", FLOW, limits=(0.0, dry_max_flow), access=Access.RP
+    )
+    wet_flow = flows.demand(
+        WET, "Wet pump flow", FLOW, limits=(0.0, wet_max_flow), access=Access.RP
+    )
+    dry_effort = efforts.demand(DRY, "Dry pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP)
+    wet_effort = efforts.demand(WET, "Wet pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP)
 
     expected_humidity = Output(
         "expected_humidity", "Expected humidity", HUMIDITY, range=(0.0, 100.0), precision=1

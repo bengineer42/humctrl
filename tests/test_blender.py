@@ -17,6 +17,7 @@ from flyball.foundation.device import (
     Sample,
     SignalSpec,
 )
+from flyball.foundation.errors import ConflictError
 from flyball.foundation.typing import Normalised
 from flyball.model.law import Transfer
 from flyball_linux.links.pwm import FakePwm
@@ -110,8 +111,12 @@ class TestTree:
     def test_roles_access_and_sections(self, blender: DualPumpBlender) -> None:
         roles = {path: (s.role, s.access) for path, s in blender.signals.items()}
         assert roles["humidity"] == (Role.DEMAND, Access.RPW)
-        assert roles["flows.dry"] == roles["flows.wet"] == (Role.DEMAND, Access.RPW)
-        assert roles["efforts.dry"] == roles["efforts.wet"] == (Role.DEMAND, Access.RPW)
+        assert roles["flows.dry"] == roles["flows.wet"] == (Role.DEMAND, Access.RP), (
+            "readback only: set_flows is the only way to move them"
+        )
+        assert roles["efforts.dry"] == roles["efforts.wet"] == (Role.DEMAND, Access.RP), (
+            "readback only: set_efforts is the only way to move them"
+        )
         assert roles["expected_humidity"] == (Role.OUTPUT, Access.RP)
         assert roles["mode"] == (Role.OUTPUT, Access.RP)
         assert roles["blend.flow"] == (Role.SETTING, Access.RP)
@@ -263,6 +268,33 @@ class TestSupplyLimits:
         assert states[blender.humidity].value == pytest.approx(25.0)
         assert states[blender.humidity].requested == pytest.approx(5.0)
         assert states[blender.humidity].at_limit == Limit.LOW
+
+
+class TestFlowsAndEffortsNotDirectlyWritable:
+    """`efforts.*`/`flows.*` are readbacks: a dashboard write must be refused, not silently
+    accepted and dropped -- see `DualPumpBlender.commit`, which never reads their `.pending`.
+    """
+
+    @pytest.mark.parametrize("address", ["efforts.dry", "efforts.wet", "flows.dry", "flows.wet"])
+    def test_a_direct_write_is_refused(
+        self, rig: Any, blender: DualPumpBlender, address: str
+    ) -> None:
+        with pytest.raises(ConflictError, match="not writable"):
+            rig.demand(blender.root, {address: 0.5})
+
+    def test_set_efforts_still_moves_the_pumps(
+        self,
+        rig: Any,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, wet = pumps
+        rig.run_command(blender, "set_efforts", {"dry": 0.3, "wet": 0.7})
+        assert dry.calls[-1] == pytest.approx(0.3)
+        assert wet.calls[-1] == pytest.approx(0.7)
+        assert blender.dry_effort.value == pytest.approx(0.3), (
+            "the command still updates the readback"
+        )
 
 
 class TestRail:
