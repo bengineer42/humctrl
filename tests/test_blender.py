@@ -122,6 +122,10 @@ class TestTree:
         assert roles["blend.flow"] == (Role.SETTING, Access.RP)
         assert roles["blend.wet_fraction"] == (Role.DEMAND, Access.RPW)
         assert roles["max_flows.dry"] == (Role.CONFIG, Access.R)
+        assert roles["supply_defaults.dry"] == roles["supply_defaults.wet"] == (
+            Role.SETTING,
+            Access.RW,
+        ), "changeable live, unlike a config signal, but never published"
         assert blender.signals["flows.dry"].tags == {"line": "dry"}
         assert blender.signals["efforts.wet"].tags == {"line": "wet"}
         assert blender.dry_flow.limits == (0.0, 2.0), "from the max_flows.dry config signal"
@@ -295,6 +299,46 @@ class TestFlowsAndEffortsNotDirectlyWritable:
         assert blender.dry_effort.value == pytest.approx(0.3), (
             "the command still updates the readback"
         )
+
+
+class TestSupplyDefaultsAreSettings:
+    """`supply_defaults.*` seed from `config.supply` but are changeable live, unlike a config
+    signal -- Ben's rule: config needs a restart, a setting does not.
+    """
+
+    def test_a_direct_write_takes_effect_on_the_next_blend_with_no_restart(
+        self,
+        rig: Any,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, wet = pumps
+        assert blender.dry_supply_default.value == pytest.approx(10.0)
+        assert blender.wet_supply_default.value == pytest.approx(90.0)
+        states = rig.demand(
+            blender.root, {"supply_defaults.dry": 36.5, "supply_defaults.wet": 88.5}
+        )
+        assert states[blender.dry_supply_default].value == pytest.approx(36.5)
+        assert states[blender.wet_supply_default].value == pytest.approx(88.5)
+        assert blender.humidity.limits == (36.5, 88.5), "neither line is bound: the new defaults"
+
+        rig.demand(blender.root, {"humidity": 50.0})
+        dry.calls.clear()
+        wet.calls.clear()
+        rig.demand(blender.root, {"supply_defaults.dry": 20.0})
+        assert blender.dry_supply_default.value == pytest.approx(20.0)
+        assert dry.calls and wet.calls, (
+            "the moved default re-blends immediately, like a moved supply"
+        )
+
+    def test_a_bound_line_ignores_its_own_default(
+        self, rig: Any, sensors: Sensors, blender: DualPumpBlender
+    ) -> None:
+        dry_h = sensors.signals["dry.humidity"]
+        rig.bind_inputs(blender, {"dry": dry_h.address})
+        rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 25.0})])
+        rig.demand(blender.root, {"supply_defaults.dry": 5.0})
+        assert blender.humidity.limits == (25.0, 90.0), "dry is bound: its default is not read"
 
 
 class TestRail:

@@ -122,8 +122,12 @@ class DualPumpBlender(Committable):
 
     dry_max_flow = max_flows.config(DRY, "Dry max flow", FLOW)
     wet_max_flow = max_flows.config(WET, "Wet max flow", FLOW)
-    dry_supply_default = supply_defaults.config(DRY, "Dry line humidity", HUMIDITY)
-    wet_supply_default = supply_defaults.config(WET, "Wet line humidity", HUMIDITY)
+    dry_supply_default = supply_defaults.setting(
+        DRY, "Dry line humidity", HUMIDITY, access=Access.RW
+    )
+    wet_supply_default = supply_defaults.setting(
+        WET, "Wet line humidity", HUMIDITY, access=Access.RW
+    )
 
     dry_supply = humidities.input(DRY, "Dry line humidity", HUMIDITY, default=dry_supply_default)
     wet_supply = humidities.input(WET, "Wet line humidity", HUMIDITY, default=wet_supply_default)
@@ -176,7 +180,17 @@ class DualPumpBlender(Committable):
         return SupplyHumidities(dry=self.dry_supply.value, wet=self.wet_supply.value)
 
     def commit(self, time_ns: int) -> None:
-        """A humidity demand starts blending; while blending, a moved supply re-blends."""
+        """A humidity demand starts blending; while blending, a moved supply re-blends.
+
+        A changed `supply_defaults.*` setting is a moved supply too, for
+        whichever line has no sensor bound: pushed onto its own readback
+        before the blend recomputes, so it takes effect on the next
+        delivery with no restart -- see `_supply`.
+        """
+        if (dry_default := self.dry_supply_default.pending) is not None:
+            self.dry_supply_default.push(dry_default, time_ns)
+        if (wet_default := self.wet_supply_default.pending) is not None:
+            self.wet_supply_default.push(wet_default, time_ns)
         if (target := self.humidity.pending) is not None:
             self._target = target
             if self.mode.value is not Mode.BLEND:

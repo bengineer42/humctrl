@@ -7,8 +7,9 @@
 `blender.humidity [W]` is clamped to `[0, 100]` by the signal's own
 `limits`. Within that, what's actually achievable is bounded by the two
 supply humidities — `dry: 0x45`, `wet: 0x46` in `hum_sensors`, whatever
-they currently read (or, on a rig with no sensor bound, the configured
-`supply.dry`/`supply.wet`). A target outside `[dry, wet]` rails to the
+they currently read (or, on a rig with no sensor bound, the
+`supply_defaults.dry`/`.wet` settings — seeded from `config.supply`,
+changeable live with a `PUT`, no restart). A target outside `[dry, wet]` rails to the
 nearer end rather than being refused — see [the split-range
 arithmetic](../3-devices/blender.md#the-split-range-arithmetic) — and the
 resulting `WriteState.at_limit` says which end. With room air on the dry

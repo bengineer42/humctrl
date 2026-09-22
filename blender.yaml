@@ -39,3 +39,4 @@ devices:
     #   mode                     output   blend|flows|efforts|stopped
     #   blend                    setting  the flow a humidity demand mixes to; set_blend
     #   max_flows.dry/.wet       config   L/min                 from dry/wet max_flow
+    #   supply_defaults.dry/.wet setting  %RH   seeded from config.supply; a live PUT changes them, no restart
