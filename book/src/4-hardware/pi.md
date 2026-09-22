@@ -21,7 +21,7 @@ and grants the named user access without root -- `install.sh` runs it for
 you automatically when it detects a Pi, or run it by hand:
 
 ```
-sudo ./scripts/setup-pi-hardware.sh $USER
+sudo ./scripts/setup-pi-hardware.sh              # to whoever ran sudo
 sudo ./scripts/setup-pi-hardware.sh --verify     # check only, change nothing
 ```
 

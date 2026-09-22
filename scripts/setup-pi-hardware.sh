@@ -2,7 +2,8 @@
 # Enables I2C and the two PWM channels this rig needs, and grants a non-root
 # user access to both -- idempotent, safe to re-run.
 #
-#   sudo ./scripts/setup-pi-hardware.sh USER      # apply
+#   sudo ./scripts/setup-pi-hardware.sh           # apply, to whoever ran sudo ($SUDO_USER)
+#   sudo ./scripts/setup-pi-hardware.sh USER      # apply, to a specific user instead
 #   sudo ./scripts/setup-pi-hardware.sh --verify  # check only, change nothing
 #
 # I2C: dtparam=i2c_arm=on in /boot/firmware/config.txt, user added to the
@@ -35,13 +36,14 @@ for arg in "$@"; do
   esac
 done
 
-if ! $verify && [ -z "$user" ]; then
-  echo "usage: $0 USER | --verify" >&2
+if [ "$EUID" -ne 0 ]; then
+  echo "run as root: sudo $0 ${user:---verify}" >&2
   exit 2
 fi
 
-if [ "$EUID" -ne 0 ]; then
-  echo "run as root: sudo $0 ${user:---verify}" >&2
+user="${user:-${SUDO_USER:-}}"
+if ! $verify && [ -z "$user" ]; then
+  echo "usage: sudo $0 [USER] | --verify -- no \$SUDO_USER to default to (running as root directly?), pass a username explicitly" >&2
   exit 2
 fi
 
@@ -65,13 +67,13 @@ if $verify; then
   [ -f "$UDEV_RULE" ] && check "installed" yes || check "installed" no
   echo "groups:"
   for g in i2c gpio; do
-    if [ -n "${SUDO_USER:-}" ] && id -nG "$SUDO_USER" 2>/dev/null | grep -qw "$g"; then
-      check "$SUDO_USER in $g" yes
+    if [ -n "$user" ] && id -nG "$user" 2>/dev/null | grep -qw "$g"; then
+      check "$user in $g" yes
     else
-      check "${SUDO_USER:-<user>} in $g" no
+      check "${user:-<user>} in $g" no
     fi
   done
-  $ok && { echo "all set."; exit 0; } || { echo "run: sudo $0 \${SUDO_USER:-\$USER}"; exit 1; }
+  $ok && { echo "all set."; exit 0; } || { echo "run: sudo $0"; exit 1; }
 fi
 
 echo "==> config.txt"
