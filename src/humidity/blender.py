@@ -1,9 +1,10 @@
 """The dual-pump blender: a composite actuator that mixes a dry and a wet line to a target %RH.
 
 A controller drives `humidity`; people run the commands. `set_flows`,
-`set_efforts` and `stop` drive the lines directly and put the blender in
-that mode; a humidity demand puts it back in BLEND, where `commit` does the
-split-range arithmetic once per delivery. `mode` says which is in force.
+`set_efforts`, `set_fraction` and `stop` drive the lines directly and put
+the blender in `flows` mode; a humidity demand (or `set_humidity`) puts it
+in `humidity` mode, where `commit` does the split-range arithmetic once per
+delivery. `mode` says which demand is in control.
 """
 
 from __future__ import annotations
@@ -91,10 +92,10 @@ def calculate_wet_fraction(humidities: SupplyHumidities, target: float) -> Norma
 
 
 class Mode(Labelled):
-    """What is driving the pumps: a humidity demand, or the last command by hand. Starts manual."""
+    """Which demand is in control of the pumps: the humidity, or the flows. Starts `flows`."""
 
-    BLEND = "blend", "Blending to a target humidity"
-    MANUAL = "manual", "Set by hand"
+    HUMIDITY = "humidity", "Blending to a humidity demand"
+    FLOWS = "flows", "Flows set directly"
 
 
 DRY = {"line": "dry"}
@@ -105,12 +106,12 @@ WET = {"line": "wet"}
 class DualPumpBlender(Committable):
     """Two pumps, blended to a target %RH; also settable directly by flow or by effort.
 
-    A demand on `humidity` puts the blender in BLEND: `commit` does the
+    A demand on `humidity` puts the blender in `humidity` mode: `commit` does the
     split-range arithmetic once per delivery (`calculate_wet_fraction`),
     however many of a new target, a changed supply reading and a new blend
     flow arrived together -- one pump write. `set_flows`, `set_efforts` and
-    `stop` drive the lines at once and change the mode, so a supply reading
-    re-blends only while blending. The flows and efforts are demands whose
+    `stop` drive the lines at once and put it in `flows` mode, so a supply
+    reading re-blends only in `humidity` mode. The flows and efforts are demands whose
     readbacks follow whatever is driving the pumps.
     """
 
@@ -128,7 +129,7 @@ class DualPumpBlender(Committable):
     dry_supply = humidities.input("dry", "Dry line humidity", HUMIDITY, default=dry_supply_default)
     wet_supply = humidities.input("wet", "Wet line humidity", HUMIDITY, default=wet_supply_default)
 
-    humidity = Demand("humidity", "Target humidity", HUMIDITY, limits=(dry_supply, wet_supply))
+    humidity = Demand("humidity", "Humidity demand", HUMIDITY, limits=(dry_supply, wet_supply))
     """Clamped to what the lines can mix: the supply humidities, as they read now."""
     # Readbacks only: `set_flows`/`set_efforts` are the only way to move these -- see
     # `commit`, which never looks at their `.staged`. Not `access=Access.RPW`'s default for
@@ -150,7 +151,7 @@ class DualPumpBlender(Committable):
     expected_humidity = Readout(
         "expected_humidity", "Expected humidity", HUMIDITY, range=(0.0, 100.0), precision=1
     )
-    mode = Readout("mode", "Mode", vtype=Mode, initial=Mode.MANUAL)
+    mode = Readout("mode", "Mode", vtype=Mode, initial=Mode.FLOWS)
     blend = Namespace("blend", "Blend")
     blend_flow = blend.setting("flow", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
     # Readback only: `set_fraction` is the only way to move it -- see `commit`, which never
@@ -184,12 +185,12 @@ class DualPumpBlender(Committable):
         return SupplyHumidities(dry=self.dry_supply.value, wet=self.wet_supply.value)
 
     def commit(self, time_ns: int) -> None:
-        """A humidity demand starts blending; while blending, a moved supply re-blends."""
+        """A humidity demand takes `humidity` mode; in it, a moved supply re-blends."""
         if (target := self.humidity.staged) is not None:
             self._target = target
-            if self.mode.value is not Mode.BLEND:
-                self.mode.push(Mode.BLEND, time_ns)
-        if self.mode.value is Mode.BLEND:
+            if self.mode.value is not Mode.HUMIDITY:
+                self.mode.push(Mode.HUMIDITY, time_ns)
+        if self.mode.value is Mode.HUMIDITY:
             self._blend_pumps(time_ns)
 
     def _blend_pumps(self, time_ns: int | None = None, blend: BlendFlow | None = None) -> None:
@@ -234,15 +235,15 @@ class DualPumpBlender(Committable):
 
         An absolute flow (and what to do if the lines cannot give it), a
         fraction of the most the blend can move at this mix, or a fraction of
-        the flow guaranteed at every mix. Takes effect at once when blending,
-        else at the next blend.
+        the flow guaranteed at every mix. Takes effect at once in `humidity`
+        mode, else at the next blend.
         """
-        if self.mode.value is Mode.BLEND:
+        if self.mode.value is Mode.HUMIDITY:
             self._blend_pumps(blend=blend_flow)  # may refuse (overdrive): then the setting stands
         else:
             self.blend_flow.push(blend_flow)
 
-    @command(mode=Mode.BLEND, interrupts=True)
+    @command(mode=Mode.HUMIDITY, interrupts=True)
     def set_humidity(self, humidity: Humidity, blend_flow: BlendFlow | None = None) -> None:
         """Blend to a humidity at a blend flow, by hand: the controller, if any, goes to manual.
 
@@ -253,7 +254,7 @@ class DualPumpBlender(Committable):
         self._target = humidity
         self._blend_pumps(blend=blend_flow)
 
-    @command(mode=Mode.MANUAL, interrupts=True)
+    @command(mode=Mode.FLOWS, interrupts=True)
     def set_fraction(self, blend_flow: BlendFlow, wet_fraction: float) -> None:
         """Blend at a wet fraction by hand, at a blend flow.
 
@@ -262,13 +263,13 @@ class DualPumpBlender(Committable):
         """
         self._set_blend(None, blend_flow, wet=wet_fraction)
 
-    @command(mode=Mode.MANUAL, interrupts=True)
+    @command(mode=Mode.FLOWS, interrupts=True)
     def set_flows(self, dry: Annotated[Flow, dry_flow], wet: Annotated[Flow, wet_flow]) -> None:
         """Drive each line at a flow. A line left out keeps its current flow."""
         self._pumps.set_flows(SupplyFlows(dry, wet))
         self._push_readbacks()
 
-    @command(mode=Mode.MANUAL, interrupts=True)
+    @command(mode=Mode.FLOWS, interrupts=True)
     def set_efforts(
         self, dry: Annotated[Normalised, dry_effort], wet: Annotated[Normalised, wet_effort]
     ) -> None:
@@ -276,7 +277,7 @@ class DualPumpBlender(Committable):
         self._pumps.set_efforts(SupplyEfforts(dry, wet))
         self._push_readbacks()
 
-    @command(mode=Mode.MANUAL, interrupts=True)
+    @command(mode=Mode.FLOWS, interrupts=True)
     def stop(self) -> None:
         """Stop both pumps at once; a controller driving the target goes to manual."""
         self._pumps.stop()

@@ -17,7 +17,7 @@ per input. People run its commands, which drive the lines at once.
 | `flows.dry`, `flows.wet` | demand, read-only | each line's flow, L/min: the readback, set only by `set_flows` -- not directly writable |
 | `efforts.dry`, `efforts.wet` | demand, read-only | each line's effort, 0–1 of full: the readback, set only by `set_efforts` -- not directly writable |
 | `expected_humidity` | output | what the current pump outputs should actually deliver |
-| `mode` | output | `blend` (a humidity demand) or `manual` (the last command by hand) |
+| `mode` | readout | which demand is in control: `humidity` (a humidity demand, or `set_humidity`) or `flows` (`set_flows`, `set_efforts`, `set_fraction`, `stop`) |
 | `blend.flow` | setting | the flow a `humidity` demand mixes to; `set_blend` |
 | `blend.wet_fraction` | demand, read-only | the share drawn from the wet line: the readback while blending, set only by `set_fraction` -- not directly writable |
 | `max_flows.dry`, `max_flows.wet` | config | each line's maximum, the limit of its flow demand |
@@ -30,11 +30,12 @@ reads a signal's access from its spec, so declaring them this way is
 enough to stop it offering a write control for them; drive the lines
 through `set_flows`/`set_efforts`/`set_fraction` instead.
 
-The mode decides what a delivery does. A `humidity` demand puts the
-blender in `blend`, where a moved supply reading re-blends; `set_flows`,
-`set_efforts`, `set_fraction` and `stop` drive the lines at once and put
-it in `manual`, where a supply reading changes nothing, so a manual flow
-is not undone by the next reading. A `line: dry`/`line: wet`
+The mode, named after the demand in control, decides what a delivery does.
+A `humidity` demand puts the blender in `humidity` mode, where a moved
+supply reading re-blends; `set_flows`, `set_efforts`, `set_fraction` and
+`stop` drive the lines at once and put it in `flows` mode, where a supply
+reading changes nothing, so a flow set by hand is not undone by the next
+reading. A `line: dry`/`line: wet`
 tag groups each line's signals across `flows`, `efforts` and
 `max_flows`, so a UI can show the tree by line as well as by kind. The
 blender is never polled: it pushes its readbacks from `commit` and from
@@ -81,8 +82,8 @@ The blender declares two inputs, `dry` and `wet` (`supply.input(...)` in
 the class body); the rig file binds them to the sensors. Whenever a bound
 signal publishes, the rig commits the blender, and `commit` reads the
 supply's newest values from the router (`self.dry_supply.value`) — there
-is no callback and no copy on the device. While blending, that re-blends;
-in any other mode it does nothing. A rig with no sensor bound uses
+is no callback and no copy on the device. In `humidity` mode that re-blends;
+in `flows` mode it does nothing. A rig with no sensor bound uses
 its `supply` field (the `supply_defaults` config signals) instead.
 `expected_humidity` is pushed after every pump write from the pumps'
 actual output and the current supply humidities.

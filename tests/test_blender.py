@@ -128,7 +128,7 @@ class TestTree:
         assert blender.signals["efforts.wet"].tags == {"line": "wet"}
         assert blender.dry_flow.limits == (0.0, 2.0), "from the max_flows.dry config signal"
         assert blender.humidity.limits == (10.0, 90.0), "the supply inputs' defaults, unbound"
-        assert blender.mode.value is Mode.MANUAL, "nothing drives the pumps until asked"
+        assert blender.mode.value is Mode.FLOWS, "nothing drives the pumps until asked"
         assert blender.dry_max_flow.value == pytest.approx(2.0)
 
     def test_commands_and_their_links(self) -> None:
@@ -140,11 +140,12 @@ class TestTree:
             "dry": "flows.dry",
             "wet": "flows.wet",
         }
-        assert commands["set_flows"].mode is Mode.MANUAL
+        assert commands["set_flows"].mode is Mode.FLOWS
         assert commands["stop"].interrupts and commands["set_flows"].interrupts
         assert commands["set_humidity"].demand_of is None, "a real command, not a synthesised one"
         assert commands["set_humidity"].params["humidity"].link == "humidity"
-        assert commands["set_humidity"].mode is Mode.BLEND and commands["set_humidity"].interrupts
+        assert commands["set_humidity"].mode is Mode.HUMIDITY
+        assert commands["set_humidity"].interrupts
         assert "set_flows_dry" not in commands, "a demand a command sets gets no setter"
 
 
@@ -158,7 +159,7 @@ class TestCommands:
         _, dry, wet = pumps
         rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
         assert dry.calls == [0.2] and wet.calls == [0.3], "flow / max_flow"
-        assert blender.mode.value is Mode.MANUAL
+        assert blender.mode.value is Mode.FLOWS
         assert blender.dry_flow.value == pytest.approx(0.4)
         assert blender.dry_effort.value == pytest.approx(0.2), "the readbacks follow the pumps"
         assert rig.router.reading(blender.signals["last.set_flows"]) is not None
@@ -196,9 +197,9 @@ class TestCommands:
         rig.bind_inputs(blender, {"dry": dry_h.address})
         rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
         rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 5.0})])
-        assert dry.calls == [0.2], "not in BLEND: the supply reading does not re-blend"
+        assert dry.calls == [0.2], "not in `humidity` mode: the supply reading does not re-blend"
         rig.write(blender.root, {"humidity": 50.0})
-        assert blender.mode.value is Mode.BLEND and len(dry.calls) == 2
+        assert blender.mode.value is Mode.HUMIDITY and len(dry.calls) == 2
 
     def test_set_humidity_blends_by_hand_and_takes_the_controller_to_manual(
         self,
@@ -213,7 +214,7 @@ class TestCommands:
         controller.regulate(50.0, transfer=Transfer.COLD)
         rig.run_command(blender, "set_humidity", {"humidity": 90.0})  # blend flow left as it is
         assert not controller.mode.active()
-        assert blender.mode.value is Mode.BLEND
+        assert blender.mode.value is Mode.HUMIDITY
         assert blender.humidity.value == pytest.approx(90.0)
         assert wet.calls[-1] == pytest.approx(0.5) and dry.calls[-1] == pytest.approx(0.0), (
             "1 L/min, all wet, on a 2 L/min line"
@@ -229,9 +230,9 @@ class TestCommands:
         rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
         assert not controller.mode.active(), "put in manual, with an event"
         assert rig.recent[-1].kind == "interrupted"
-        assert blender.mode.value is Mode.MANUAL
+        assert blender.mode.value is Mode.FLOWS
         controller.regulate(50.0, transfer=Transfer.COLD)
-        assert blender.mode.value is Mode.BLEND, "a humidity demand takes it back"
+        assert blender.mode.value is Mode.HUMIDITY, "a humidity demand takes it back"
 
 
 class TestOneCommitPerDelivery:
@@ -340,7 +341,7 @@ def test_stop_is_a_command_not_a_demand(
     assert "stop" in blender.commands
     rig.run_command(blender, "stop")
     assert dry.effort == pytest.approx(0.0) and wet.effort == pytest.approx(0.0)
-    assert blender.dry_flow.value == pytest.approx(0.0) and blender.mode.value is Mode.MANUAL
+    assert blender.dry_flow.value == pytest.approx(0.0) and blender.mode.value is Mode.FLOWS
 
 
 class TestPwmPump:
