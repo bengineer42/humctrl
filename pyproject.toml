@@ -7,6 +7,8 @@ name = "humidity"
 version = "0.1.0"
 description = "Split-range humidity control rig built on flyball: rig-multi-sensor.yaml and the dual-pump blender"
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Ben Laurence" }]
 # The I2C bus (flyball-linux) and the sht4x/sht4x_set chip driver
 # (flyball-chips, protocol-level) are separate packages since the
@@ -15,6 +17,8 @@ authors = [{ name = "Ben Laurence" }]
 # (its split-range arithmetic) and sim_humidity_chamber (its simulated plant).
 dependencies = ["flyball[web]", "flyball-linux[i2c]", "flyball-chips"]
 
+# Not for PyPI: this is one rig's application, not a library. MIT still
+# governs the code -- the classifier only stops an accidental upload.
 classifiers = ["Private :: Do Not Upload"]
 
 # What `flyball rig check`, the runner and the schema load to make

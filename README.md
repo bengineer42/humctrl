@@ -63,3 +63,16 @@ and the built-in humidity programs.
 
 Pinned to a flyball commit in `pyproject.toml` (`[tool.uv.sources]`), not a local path — this
 repo resolves standalone, it doesn't need to sit nested inside a flyball checkout to build.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). flyball itself is MIT too.
+
+Contributions are certified by a [Developer Certificate of Origin](https://developercertificate.org/)
+sign-off, the same as flyball: add `Signed-off-by:` to each commit, which `git commit -s` does
+for you. flyball's `CONTRIBUTING.md` explains what that line means.
+
+Security: please report a vulnerability privately rather than in an issue —
+<https://github.com/bengineer42/humctrl/security/advisories/new>. This rig drives pumps, so a
+bug that moves an actuator is a safety problem as well as a security one. flyball's
+`SECURITY.md` covers the engine, the daemon and the API underneath this repo.

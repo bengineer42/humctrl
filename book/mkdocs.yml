@@ -6,6 +6,7 @@ site_dir: ../build/book
 strict: true
 site_url: https://bengineer42.github.io/humctrl/
 repo_url: https://github.com/bengineer42/humctrl
+copyright: Copyright &copy; 2026 Ben Laurence &mdash; MIT licensed
 repo_name: ""          # the logo alone, no text
 
 theme:
