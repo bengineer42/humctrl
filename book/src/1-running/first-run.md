@@ -62,7 +62,7 @@ or by effort, 0–1 of full, with `set_efforts`:
 flyball invoke blender set_efforts dry=0.3 wet=0.3
 ```
 
-## Set a target humidity
+## Set a humidity setpoint
 
 `blender.humidity` is driven by the `blender.humidity` controller, marked
 `default: true` in `rig-multi-sensor.yaml` — so `humidity` itself refuses a direct

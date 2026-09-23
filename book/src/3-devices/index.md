@@ -19,7 +19,7 @@ or the controller that binds them:
 | device | driver | what it is |
 | --- | --- | --- |
 | `hum_sensors` | `sht4x_set` | three SHT4x sensors, each its own namespace |
-| `blender` | `dual_pump_blender` | two PWM pumps, blended to a target humidity |
+| `blender` | `dual_pump_blender` | two PWM pumps, blended to a humidity demand |
 
 ## `hum_sensors`
 
