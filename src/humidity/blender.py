@@ -17,7 +17,7 @@ from flyball.foundation.device import (
     DriverConfig,
     Limit,
     Namespace,
-    Output,
+    Readout,
     Section,
     command,
 )
@@ -143,10 +143,10 @@ class DualPumpBlender(Committable):
     dry_effort = efforts.demand(DRY, "Dry pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP)
     wet_effort = efforts.demand(WET, "Wet pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP)
 
-    expected_humidity = Output(
+    expected_humidity = Readout(
         "expected_humidity", "Expected humidity", HUMIDITY, range=(0.0, 100.0), precision=1
     )
-    mode = Output("mode", "Mode", vtype=Mode, initial=Mode.MANUAL)
+    mode = Readout("mode", "Mode", vtype=Mode, initial=Mode.MANUAL)
     blend = Namespace("blend", "Blend")
     blend_flow = blend.setting("flow", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
     # Readback only: `set_fraction` is the only way to move it -- see `commit`, which never

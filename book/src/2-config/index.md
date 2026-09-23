@@ -58,7 +58,7 @@ devices:
 
 controllers:
   blender.humidity:
-    signal: hum_sensors.chamber.humidity
+    measured: hum_sensors.chamber.humidity
     law: { tag: PI, kp: 0.8, ki: 0.02, tt: 60 }
     default: true
 ```
@@ -90,8 +90,9 @@ only `dual_pump_blender`'s split-range arithmetic and
   `config`, shared by both lines, if `rig-multi-sensor.yaml` needs to override it.
 - **`blender.bound`** wires the blender to follow the two supply sensors'
   humidity directly — see [The blender device](../3-devices/blender.md#following-the-supply-lines).
-- **`controllers.blender.humidity`** is named by its target (`blender`'s
-  `humidity` signal), regulates the chamber's published humidity through a
+- **`controllers.blender.humidity`** is named by its output (`blender`'s
+  `humidity` demand), regulates the chamber's published humidity (its
+  `measured:` signal) through a
   PI law, and is `default: true` — the controller a program step or a
   `flyball` command uses when it names none.
 

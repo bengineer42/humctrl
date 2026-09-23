@@ -55,7 +55,8 @@ root. `rig-multi-sensor.yaml`'s own comment gives the tree the driver declares:
 ```
 
 `humidity` is the only signal a controller may drive — it's the split-range
-target, and `blender.humidity` is exactly that controller's name. The rest
+demand, the controller's output, and `blender.humidity` is exactly that
+controller's name. The rest
 are readbacks, `[RP]` not `[RPW]`: a direct demand on `flows.dry`,
 `efforts.wet`, `blend.wet_fraction` or `blend.flow` is refused ("not
 writable") rather than silently dropped, because `commit` only ever reads
@@ -71,17 +72,18 @@ next `commit` — no bus poll of its own for that half of the picture.
 
 ## The controller
 
-One controller, `blender.humidity`, named by the signal it drives:
+One controller, `blender.humidity`, named by the demand it drives (its output):
 
 ```yaml
 controllers:
   blender.humidity:
-    signal: hum_sensors.chamber.humidity
+    measured: hum_sensors.chamber.humidity
     law: { tag: PI, kp: 0.8, ki: 0.02, tt: 60 }
     default: true
 ```
 
-It binds the chamber's published humidity (the source, `[P]`) to the
-blender's `humidity` target (`[W]`) through a PI law, and is the rig's
+It regulates the chamber's published humidity (its `measured` signal,
+`[P]`) by writing the blender's `humidity` demand (its output, `[RPW]`)
+through a PI law, and is the rig's
 default — the one a program step or a `flyball` command uses when it names
 no controller at all.

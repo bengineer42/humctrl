@@ -117,8 +117,8 @@ class TestTree:
         assert roles["efforts.dry"] == roles["efforts.wet"] == (Role.DEMAND, Access.RP), (
             "readback only: set_efforts is the only way to move them"
         )
-        assert roles["expected_humidity"] == (Role.OUTPUT, Access.RP)
-        assert roles["mode"] == (Role.OUTPUT, Access.RP)
+        assert roles["expected_humidity"] == (Role.READOUT, Access.RP)
+        assert roles["mode"] == (Role.READOUT, Access.RP)
         assert roles["blend.flow"] == (Role.SETTING, Access.RP)
         assert roles["blend.wet_fraction"] == (Role.DEMAND, Access.RP), (
             "readback only: set_fraction is the only way to move it"

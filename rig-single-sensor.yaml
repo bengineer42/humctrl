@@ -30,6 +30,6 @@ devices:
 
 controllers:
   blender.humidity:
-    signal: chamber_sensor.humidity
+    measured: chamber_sensor.humidity
     law: { tag: PI, kp: 0.8, ki: 0.02, tt: 60 }
     default: true
