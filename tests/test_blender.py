@@ -210,7 +210,7 @@ class TestCommands:
         _, dry, wet = pumps
         chamber_h = sensors.signals["chamber.humidity"]
         controller = rig.attach_controller(blender.humidity, chamber_h, law=P(kp=1.0))
-        controller.regulate(50.0, transfer=Transfer.RESET)
+        controller.regulate(50.0, transfer=Transfer.COLD)
         rig.run_command(blender, "set_humidity", {"humidity": 90.0})  # blend flow left as it is
         assert not controller.mode.active()
         assert blender.mode.value is Mode.BLEND
@@ -225,12 +225,12 @@ class TestCommands:
     ) -> None:
         chamber_h = sensors.signals["chamber.humidity"]
         controller = rig.attach_controller(blender.humidity, chamber_h, law=P(kp=1.0))
-        controller.regulate(50.0, transfer=Transfer.RESET)
+        controller.regulate(50.0, transfer=Transfer.COLD)
         rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
         assert not controller.mode.active(), "put in manual, with an event"
         assert rig.recent[-1].kind == "interrupted"
         assert blender.mode.value is Mode.MANUAL
-        controller.regulate(50.0, transfer=Transfer.RESET)
+        controller.regulate(50.0, transfer=Transfer.COLD)
         assert blender.mode.value is Mode.BLEND, "a humidity demand takes it back"
 
 
@@ -247,7 +247,7 @@ class TestOneCommitPerDelivery:
         chamber_h = sensors.signals["chamber.humidity"]
         rig.bind_inputs(blender, {"dry": dry_h.address})
         controller = rig.attach_controller(blender.humidity, chamber_h, law=P(kp=1.0))
-        controller.regulate(50.0, transfer=Transfer.RESET)
+        controller.regulate(50.0, transfer=Transfer.COLD)
         assert len(dry.calls) == 1, "arming the controller writes once, outside a delivery"
 
         rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 5.0})])

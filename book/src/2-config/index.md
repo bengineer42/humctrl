@@ -41,7 +41,7 @@ devices:
         dry: { address: 0x45 }
         wet: { address: 0x46 }
     signals:
-      chamber: { signals: { humidity: { warn: [20, 80] } } }
+      chamber: { signals: { humidity: { warning: [20, 80] } } }
       dry: { poll_s: 5 }     # the supply lines drift slowly; no need to poll them as often
       wet: { poll_s: 5 }
 
@@ -79,7 +79,7 @@ only `dual_pump_blender`'s split-range arithmetic and
   envelope key, so the tree can't be changed by `signals:` overrides, only
   by editing `sensors:` itself.
 - **`hum_sensors.signals`** is envelope overrides only: `chamber`'s
-  `humidity` gets a warn band, `dry` and `wet` are polled every 5 s instead
+  `humidity` gets a warning band, `dry` and `wet` are polled every 5 s instead
   of inheriting the device's `poll_s: 1`.
 - **`blender.config`** is the two pump lines (PWM channel, deadband,
   max flow) and the starting `blend_flow`; `link: pwm0` is driven directly

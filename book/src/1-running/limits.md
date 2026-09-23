@@ -15,7 +15,7 @@ resulting `WriteState.at_limit` says which end. With room air on the dry
 line, the practical floor is ambient %RH, not zero.
 
 `hum_sensors.chamber.humidity`'s own signal `range` is `[0, 100]`
-(precision 2), and `rig-multi-sensor.yaml` adds a `warn: [20, 80]` band on top — inside
+(precision 2), and `rig-multi-sensor.yaml` adds a `warning: [20, 80]` band on top — inside
 `[0, 100]` but a narrower range the UI flags outside of, independent of
 any control limit.
 

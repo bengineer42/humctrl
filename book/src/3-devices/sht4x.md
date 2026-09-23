@@ -95,7 +95,7 @@ hum_sensors:
       dry: { address: 0x45 }
       wet: { address: 0x46 }
   signals:
-    chamber: { signals: { humidity: { warn: [20, 80] } } }
+    chamber: { signals: { humidity: { warning: [20, 80] } } }
     dry: { poll_s: 5 }
     wet: { poll_s: 5 }
 ```
@@ -105,6 +105,6 @@ hum_sensors:
 sensor in `config.sensors` is just its address (`config.precision` would
 set `"medium"`/`"low"` for all of them, if this rig ever needed to trade
 accuracy for speed — it doesn't). `signals:` in the envelope carries
-overrides only — `chamber.humidity`'s warn band, and the two supply
+overrides only — `chamber.humidity`'s warning band, and the two supply
 lines' slower poll — never a new tree; the tree itself (which namespaces
 exist) is declared by `config.sensors`, not by `signals:`.

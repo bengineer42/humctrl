@@ -104,7 +104,7 @@ def test_the_default_controller_settles_the_chamber_towards_its_reference() -> N
     ).build(clock=clock)
     controller = rig.controllers.resolve(None)
     assert controller is not None
-    controller.regulate(60.0, transfer=Transfer.RESET)
+    controller.regulate(60.0, transfer=Transfer.COLD)
     clock.advance(600.0)  # volume_l 3, up to 2 L/min a line: tau well under a minute
     chamber_humidity = rig.devices["hum_sensors"].signals["chamber.humidity"]
     assert rig.read(chamber_humidity).value == pytest.approx(60.0, abs=2.0)
