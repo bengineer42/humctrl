@@ -34,12 +34,11 @@ devices:
     driver: sht4x_set
     label: Humidity sensors
     poll_s: 1
-    config:
-      link: i2c1
-      sensors:
-        chamber: { address: 0x44 }
-        dry: { address: 0x45 }
-        wet: { address: 0x46 }
+    link: i2c1
+    sensors:
+      chamber: { address: 0x44 }
+      dry: { address: 0x45 }
+      wet: { address: 0x46 }
     signals:
       chamber: { signals: { humidity: { warning: [20, 80] } } }
       dry: { poll_s: 5 }     # the supply lines drift slowly; no need to poll them as often
@@ -49,11 +48,10 @@ devices:
     driver: dual_pump_blender
     label: Pump blender
     poll_s: 1
-    config:
-      link: pwm0
-      dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
-      wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
-      blend_flow: 1.0
+    link: pwm0
+    dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
+    wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
+    blend_flow: 1.0
     bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }   # this file's own addition
 
 controllers:
@@ -73,21 +71,21 @@ only `dual_pump_blender`'s split-range arithmetic and
 `pwm0` is PWM chip 0 (`flyball_linux.links.pwm.PwmConfig`, sysfs
 `/sys/class/pwm/pwmchip0`, no extra library). Field by field:
 
-- **`hum_sensors.config.sensors`** declares the device's tree — one
+- **`hum_sensors.sensors`** declares the device's tree — one
   namespace per key, each an SHT4x at that I²C address. This is
   `sht4x_set`'s own config (`flyball_chips.sht4x`), not an
-  envelope key, so the tree can't be changed by `signals:` overrides, only
+  envelope key, so the tree can't be changed by `signals:` metadata, only
   by editing `sensors:` itself.
-- **`hum_sensors.signals`** is envelope overrides only: `chamber`'s
+- **`hum_sensors.signals`** is signal metadata only: `chamber`'s
   `humidity` gets a warning band, `dry` and `wet` are polled every 5 s instead
   of inheriting the device's `poll_s: 1`.
-- **`blender.config`** is the two pump lines (PWM channel, deadband,
+- **`blender`'s own fields** are the two pump lines (PWM channel, deadband,
   max flow) and the starting `blend_flow`; `link: pwm0` is driven directly
   through `flyball_linux`'s `PwmLink` protocol (`configure`/`enable`) —
   the blender owns both channels itself rather than wrapping a
   `pwm_channel` device each, since the split-range arithmetic is its own.
-  A `frequency_hz` field (default 20 000 Hz) is also available in
-  `config`, shared by both lines, if `rig-multi-sensor.yaml` needs to override it.
+  A `frequency_hz` field (default 20 000 Hz) is also available,
+  shared by both lines, if `rig-multi-sensor.yaml` needs to override it.
 - **`blender.bound`** wires the blender to follow the two supply sensors'
   humidity directly — see [The blender device](../3-devices/blender.md#following-the-supply-lines).
 - **`controllers.blender.humidity`** is named by its output (`blender`'s
@@ -138,25 +136,23 @@ devices:
     driver: sim_daq
     label: Humidity sensors (simulated)
     poll_s: 1
-    config:
-      link: chamber
-      ports:
-        chamber.humidity: { port: chamber_humidity, quantity: humidity, unit: "%RH" }
-        chamber.temperature: { port: chamber_temperature, quantity: temperature, unit: "°C" }
-        dry.humidity: { port: dry_humidity, quantity: humidity, unit: "%RH" }
-        dry.temperature: { port: dry_temperature, quantity: temperature, unit: "°C" }
-        wet.humidity: { port: wet_humidity, quantity: humidity, unit: "%RH" }
-        wet.temperature: { port: wet_temperature, quantity: temperature, unit: "°C" }
+    link: chamber
+    ports:
+      chamber.humidity: { port: chamber_humidity, quantity: humidity, unit: "%RH" }
+      chamber.temperature: { port: chamber_temperature, quantity: temperature, unit: "°C" }
+      dry.humidity: { port: dry_humidity, quantity: humidity, unit: "%RH" }
+      dry.temperature: { port: dry_temperature, quantity: temperature, unit: "°C" }
+      wet.humidity: { port: wet_humidity, quantity: humidity, unit: "%RH" }
+      wet.temperature: { port: wet_temperature, quantity: temperature, unit: "°C" }
 
   blender:
     driver: dual_pump_blender               # the *real* driver: the chamber stands in for pwm0
     label: Pump blender (simulated)
     poll_s: 1
-    config:
-      link: chamber
-      dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
-      wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }   # L/min
-      blend_flow: 1.0
+    link: chamber
+    dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
+    wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }   # L/min
+    blend_flow: 1.0
     bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 
 # blender.humidity -> hum_sensors.chamber.humidity: the same addresses as
@@ -251,7 +247,7 @@ operator picks at runtime.
 
 ## `--set` and multiple overlays
 
-`--set devices.blender.config.blend_flow=1.5` overrides one value from the
+`--set devices.blender.blend_flow=1.5` overrides one value from the
 command line, applied after every file. A third file (say, a noisier
 plant) would overlay both `rig-multi-sensor.yaml` and `sim.yaml` the same way — later
 file wins, in the order given.

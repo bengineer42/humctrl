@@ -31,15 +31,14 @@ devices:
   blender:                                 # two pumps blended into one settable humidity
     driver: dual_pump_blender
     label: Pump blender
-    config:
-      link: pwm0
-      dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
-      wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
-      blend_flow: 1.0
-      # Measured 22 Sep on the real rig (single-sensor: dry/wet unbound, so these
-      # are the only source of truth) -- each pump run alone at full effort until
-      # the chamber's own reading settled. Supersedes an earlier guess (35/90.5).
-      supply: { dry: 36.5, wet: 88.5 }
+    link: pwm0
+    dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
+    wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
+    blend_flow: 1.0
+    # Measured 22 Sep on the real rig (single-sensor: dry/wet unbound, so these
+    # are the only source of truth) -- each pump run alone at full effort until
+    # the chamber's own reading settled. Supersedes an earlier guess (35/90.5).
+    supply: { dry: 36.5, wet: 88.5 }
     # signals the driver declares (no poll: it pushes from commit and its commands):
     #   humidity                 demand   %RH, limits [0, 100]  the split-range target; a controller's
     #   flows.dry, flows.wet     demand   L/min    read-only readbacks; set only by set_flows

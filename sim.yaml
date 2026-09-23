@@ -58,24 +58,22 @@ devices:
     driver: sim_daq
     label: Humidity sensors (simulated)
     poll_s: 1
-    config:
-      link: chamber
-      ports:
-        chamber.humidity: { port: chamber_humidity, quantity: humidity, unit: "%RH" }
-        chamber.temperature: { port: chamber_temperature, quantity: temperature, unit: "°C" }
-        dry.humidity: { port: dry_humidity, quantity: humidity, unit: "%RH" }
-        dry.temperature: { port: dry_temperature, quantity: temperature, unit: "°C" }
-        wet.humidity: { port: wet_humidity, quantity: humidity, unit: "%RH" }
-        wet.temperature: { port: wet_temperature, quantity: temperature, unit: "°C" }
+    link: chamber
+    ports:
+      chamber.humidity: { port: chamber_humidity, quantity: humidity, unit: "%RH" }
+      chamber.temperature: { port: chamber_temperature, quantity: temperature, unit: "°C" }
+      dry.humidity: { port: dry_humidity, quantity: humidity, unit: "%RH" }
+      dry.temperature: { port: dry_temperature, quantity: temperature, unit: "°C" }
+      wet.humidity: { port: wet_humidity, quantity: humidity, unit: "%RH" }
+      wet.temperature: { port: wet_temperature, quantity: temperature, unit: "°C" }
 
   blender:
     driver: dual_pump_blender               # the real driver: the chamber stands in for pwm0
     label: Pump blender (simulated)
-    config:
-      link: chamber
-      dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min; channel matches DRY_CHANNEL
-      wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }   # L/min; channel matches WET_CHANNEL
-      blend_flow: 1.0
+    link: chamber
+    dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min; channel matches DRY_CHANNEL
+    wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }   # L/min; channel matches WET_CHANNEL
+    blend_flow: 1.0
     bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 
 # blender.humidity -> hum_sensors.chamber.humidity: the same addresses as

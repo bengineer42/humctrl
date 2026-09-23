@@ -74,7 +74,7 @@ node)`:
 - given no node (the periodic poll), reads only the namespaces **due** —
   at least `0.9 × poll_s` since the last read, on each namespace's own
   period: `chamber` roughly every second, `dry`/`wet` every five, per
-  `rig-multi-sensor.yaml`'s overrides;
+  `rig-multi-sensor.yaml`'s `signals:` metadata;
 - given a node directly (`rig.read(hum_sensors.dry, fresh=True)`), reads it
   regardless of when it was last due.
 
@@ -88,12 +88,11 @@ hum_sensors:
   driver: sht4x_set
   label: Humidity sensors
   poll_s: 1
-  config:
-    link: i2c1
-    sensors:
-      chamber: { address: 0x44 }
-      dry: { address: 0x45 }
-      wet: { address: 0x46 }
+  link: i2c1
+  sensors:
+    chamber: { address: 0x44 }
+    dry: { address: 0x45 }
+    wet: { address: 0x46 }
   signals:
     chamber: { signals: { humidity: { warning: [20, 80] } } }
     dry: { poll_s: 5 }
@@ -102,9 +101,9 @@ hum_sensors:
 
 `link` names an I2C bus link (`i2c1: { type: i2c, bus: 1 }`,
 `/dev/i2c-1` through `smbus2` — `flyball_linux.links.i2c.I2cConfig`); each
-sensor in `config.sensors` is just its address (`config.precision` would
+sensor in `sensors` is just its address (`precision` would
 set `"medium"`/`"low"` for all of them, if this rig ever needed to trade
 accuracy for speed — it doesn't). `signals:` in the envelope carries
-overrides only — `chamber.humidity`'s warning band, and the two supply
+metadata only — `chamber.humidity`'s warning band, and the two supply
 lines' slower poll — never a new tree; the tree itself (which namespaces
-exist) is declared by `config.sensors`, not by `signals:`.
+exist) is declared by `sensors`, not by `signals:`.

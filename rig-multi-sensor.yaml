@@ -19,12 +19,11 @@ devices:
     driver: sht4x_set
     label: Humidity sensors
     poll_s: 1
-    config:
-      link: i2c1
-      sensors:
-        chamber: { address: 0x44 }
-        dry: { address: 0x45 }
-        wet: { address: 0x46 }
+    link: i2c1
+    sensors:
+      chamber: { address: 0x44 }
+      dry: { address: 0x45 }
+      wet: { address: 0x46 }
     signals:                               # labels and a `line` tag: what the UI titles and filters by
       chamber:
         label: Chamber

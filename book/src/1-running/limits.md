@@ -62,7 +62,7 @@ device](../3-devices/sht4x.md#one-i2c-transaction-command-to-decode)).
 
 `hum_sensors.chamber` polls every 1 s (the device's own `poll_s`);
 `hum_sensors.dry`/`hum_sensors.wet` every 5 s (`rig-multi-sensor.yaml`'s per-namespace
-override) — the supply lines drift slowly enough that polling them as
+`poll_s`) — the supply lines drift slowly enough that polling them as
 often as the chamber buys nothing. `blender` itself polls every 1 s, but
 its `read` never touches the bus: every value it reports is computed from
 the pumps' own state, so its poll rate only bounds how fresh the

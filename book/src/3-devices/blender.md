@@ -69,7 +69,7 @@ turns into a PWM duty ratio (`calculate_duty_ratio`, honouring that line's
 `configure(channel, period_ns, duty_ns)` then `enable(channel, ...)`. The
 blender owns both channels directly rather than wrapping a `pwm_channel`
 device each: the split-range maths is its own, so one PWM chip link
-(`config.link`) is enough.
+(`link`) is enough.
 
 ## Following the supply lines
 
@@ -83,7 +83,7 @@ signal publishes, the rig commits the blender, and `commit` reads the
 supply's newest values from the router (`self.dry_supply.value`) — there
 is no callback and no copy on the device. While blending, that re-blends;
 in any other mode it does nothing. A rig with no sensor bound uses
-`config.supply` (the `supply_defaults` config signals) instead.
+its `supply` field (the `supply_defaults` config signals) instead.
 `expected_humidity` is pushed after every pump write from the pumps'
 actual output and the current supply humidities.
 
@@ -111,19 +111,18 @@ actual output and the current supply humidities.
 blender:
   driver: dual_pump_blender
   label: Pump blender
-  config:
-    link: pwm0
-    dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
-    wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
-    blend_flow: 1.0
+  link: pwm0
+  dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
+  wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
+  blend_flow: 1.0
   bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 ```
 
 `link` names a PWM chip link (`pwm0: { type: pwm, chip: 0 }`, from
 `flyball-linux` — sysfs `/sys/class/pwm/pwmchip0`, no extra library);
 `dry`/`wet` are each a channel number, a deadband (0–1, below which the
-pump doesn't turn) and a max flow. `config` also takes a `frequency_hz`
+pump doesn't turn) and a max flow. The driver also takes a `frequency_hz`
 (default 20 000 Hz), the PWM carrier both lines share. A rig with no
 sensor bound to `dry`/`wet` may give a starting `supply: { dry: …, wet: …
-}` in `config` instead of `bound` — see `DualPumpBlenderConfig.supply` in
+}` instead of `bound` — see `DualPumpBlenderConfig.supply` in
 `blender.py`.
