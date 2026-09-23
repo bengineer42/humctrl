@@ -78,7 +78,7 @@ One controller, `blender.humidity`, named by the demand it drives (its output):
 controllers:
   blender.humidity:
     measured: hum_sensors.chamber.humidity
-    law: { tag: PI, kp: 0.8, ki: 0.02, tt: 60 }
+    law: { type: PI, kp: 0.8, ki: 0.02, tt: 60 }
     default: true
 ```
 

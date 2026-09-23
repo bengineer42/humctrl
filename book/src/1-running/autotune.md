@@ -92,6 +92,6 @@ need detuning rather than a cleverer rule.
   rule.
 
 `Gains.of_ideal`/the fitted `Gains` give `kp`, `ki`, `kd`, `tt` in the same
-parallel form `blender.humidity`'s `law: { tag: PI, kp, ki, tt }` already
+parallel form `blender.humidity`'s `law: { type: PI, kp, ki, tt }` already
 uses, so a fitted result drops straight into `rig-multi-sensor.yaml` once it looks
 right.

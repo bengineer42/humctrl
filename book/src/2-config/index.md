@@ -26,8 +26,8 @@ name: humidity
 extends: [blender.yaml]                    # pwm0 and the blender device come from here
 
 links:
-  i2c1: { tag: i2c, bus: 1 }
-  pwm0: { tag: pwm, chip: 0 }              # (blender.yaml)
+  i2c1: { type: i2c, bus: 1 }
+  pwm0: { type: pwm, chip: 0 }              # (blender.yaml)
 
 devices:
   hum_sensors:                             # hum_sensors.chamber/dry/wet .humidity/.temperature [RP]
@@ -59,7 +59,7 @@ devices:
 controllers:
   blender.humidity:
     measured: hum_sensors.chamber.humidity
-    law: { tag: PI, kp: 0.8, ki: 0.02, tt: 60 }
+    law: { type: PI, kp: 0.8, ki: 0.02, tt: 60 }
     default: true
 ```
 
@@ -112,7 +112,7 @@ links:
   i2c1: null
   pwm0: null
   chamber:
-    tag: sim_humidity_chamber
+    type: sim_humidity_chamber
     volume_l: 3.0                  # litres
     dry_flow_l_per_min: 2.0        # match blender.dry.max_flow below
     wet_flow_l_per_min: 2.0        # match blender.wet.max_flow below
@@ -226,7 +226,7 @@ by its filename stem — are loaded onto `rig.tunings` when
 # tunings/gentle.yaml -- the demo's starting law
 # Proportional only, on top of the blender's feedforward: settles a little
 # short of the setpoint and never oscillates.
-tag: P
+type: P
 kp: 0.5
 ```
 
@@ -235,7 +235,7 @@ kp: 0.5
 # PID for the simulated chamber: 1 s samples on a ~6 s lag at full flow, so
 # the derivative gain is kept small -- at 8 it drove the pumps bang-bang on
 # sensor noise. Integral time 10 s; tracking time 5 s for anti-windup.
-tag: PID
+type: PID
 kp: 0.8
 ki: 0.08
 kd: 1.0

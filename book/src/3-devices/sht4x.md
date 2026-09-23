@@ -9,7 +9,7 @@ dependency of this package (`examples/humidity/pyproject.toml`:
 `I2cLink` (`flyball.hardware.i2c`: register reads/writes at an address,
 plus raw `write`/`read` for a chip with no register map, like this one):
 
-| driver tag | class | tree |
+| driver | class | tree |
 | --- | --- | --- |
 | `sht4x` | `Sht4x` | one chip on the device root: `humidity`, `temperature [RP]` |
 | `sht4x_set` | `Sht4xSet` | several chips, one atomic namespace each |
@@ -100,7 +100,7 @@ hum_sensors:
     wet: { poll_s: 5 }
 ```
 
-`link` names an I2C bus link (`i2c1: { tag: i2c, bus: 1 }`,
+`link` names an I2C bus link (`i2c1: { type: i2c, bus: 1 }`,
 `/dev/i2c-1` through `smbus2` — `flyball_linux.links.i2c.I2cConfig`); each
 sensor in `config.sensors` is just its address (`config.precision` would
 set `"medium"`/`"low"` for all of them, if this rig ever needed to trade

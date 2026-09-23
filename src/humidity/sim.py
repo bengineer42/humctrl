@@ -249,7 +249,7 @@ def _clamp_rh(value: float) -> float:
     return min(100.0, max(0.0, value))
 
 
-class HumidityChamberConfig(Config[HumidityChamber], tag="sim_humidity_chamber"):
+class HumidityChamberConfig(Config[HumidityChamber], type="sim_humidity_chamber"):
     """A mixing-model chamber; every field is physical, and documents its own unit.
 
     Steady state (no drift, no clamp): `wet_fraction` 0 rests at `dry_rh`, 1

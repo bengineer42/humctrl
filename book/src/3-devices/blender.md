@@ -2,7 +2,7 @@
 
 *How a demand becomes two pump flows: blend policy, supply humidities, limits.*
 
-`DualPumpBlender` (`examples/humidity/src/humidity/blender.py`, driver tag
+`DualPumpBlender` (`examples/humidity/src/humidity/blender.py`, driver type
 `dual_pump_blender`) is a composite device: a controller drives its
 `humidity` demand, and `commit` does the split-range arithmetic once per
 delivery, however many of a new target, a changed supply reading and a
@@ -119,7 +119,7 @@ blender:
   bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 ```
 
-`link` names a PWM chip link (`pwm0: { tag: pwm, chip: 0 }`, from
+`link` names a PWM chip link (`pwm0: { type: pwm, chip: 0 }`, from
 `flyball-linux` — sysfs `/sys/class/pwm/pwmchip0`, no extra library);
 `dry`/`wet` are each a channel number, a deadband (0–1, below which the
 pump doesn't turn) and a max flow. `config` also takes a `frequency_hz`

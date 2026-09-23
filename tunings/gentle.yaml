@@ -1,4 +1,4 @@
 # Proportional only, on top of the blender's feedforward: settles a little
 # short of the setpoint and never oscillates. The demo's starting law.
-tag: P
+type: P
 kp: 0.5

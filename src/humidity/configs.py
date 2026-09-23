@@ -1,4 +1,4 @@
-"""The entry-point target: explicitly registers this package's tagged configs.
+"""The entry-point target: explicitly registers this package's typed configs.
 
 `i2c`/`sht4x`/`sht4x_set`/`pwm` come from `flyball-linux`, a dependency, and
 that package's own `flyball.configs` entry point registers those -- nothing

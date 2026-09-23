@@ -32,7 +32,7 @@ links:
   i2c1: null
   pwm0: null
   chamber:
-    tag: sim_humidity_chamber
+    type: sim_humidity_chamber
     volume_l: 3.0                  # litres
     dry_flow_l_per_min: 2.0        # match blender.dry.max_flow below
     wet_flow_l_per_min: 2.0        # match blender.wet.max_flow below

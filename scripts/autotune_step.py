@@ -37,7 +37,7 @@ def run(
     print(f"regulating {controller!r} open-loop at {base}, watching {source!r}")
     rig.post(
         f"/api/controllers/{controller}/regulate",
-        {"at": base, "tuning": {"tag": "open_loop"}},
+        {"at": base, "tuning": {"type": "open_loop"}},
     )
 
     test = StepTest(base=base, size=size, window=window, band=band, timeout=timeout)
@@ -62,7 +62,7 @@ def run(
     print()
     print(f"IMC gains: kp={gains.kp:.4g}  ki={gains.ki:.4g}  tt={gains.tt:.4g}")
     print("law:")
-    print("  tag: PI")
+    print("  type: PI")
     print(f"  kp: {gains.kp:.4g}")
     print(f"  ki: {gains.ki:.4g}")
     print(f"  tt: {gains.tt:.4g}")

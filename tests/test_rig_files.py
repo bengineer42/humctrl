@@ -52,7 +52,7 @@ def _real_blender() -> DualPumpBlender:
         supply=SupplyConfig(dry=10.0, wet=90.0),
     )
     # As `DeviceEntry.build` substitutes a link name for the built object: `model_copy`
-    # bypasses validation, since `FakePwm` is not one of `PwmLinkConfig`'s tagged members.
+    # bypasses validation, since `FakePwm` is not one of `PwmLinkConfig`'s union members.
     return config.model_copy(update={"link": FakePwm()}).build("blender")
 
 

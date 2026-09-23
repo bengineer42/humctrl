@@ -21,7 +21,7 @@ class PumpDriver(Protocol):
 class PwmPump:
     """One `PwmLink` channel, driven 0-1 of full with an optional deadband.
 
-    Real hardware (`flyball_linux.links.pwm.PwmConfig`, tag `pwm`) and its
+    Real hardware (`flyball_linux.links.pwm.PwmConfig`, type `pwm`) and its
     fake (`fake_pwm`) share this protocol, so this driver -- and the
     blender that uses it -- never touches a real chip in a test.
     """

@@ -12,7 +12,7 @@ name: humidity
 extends: [blender.yaml]                    # the pump blender and its PWM chip
 
 links:
-  i2c1: { tag: i2c, bus: 1 }
+  i2c1: { type: i2c, bus: 1 }
 
 devices:
   hum_sensors:                             # hum_sensors.chamber/dry/wet .humidity/.temperature [RP]
@@ -49,5 +49,5 @@ devices:
 controllers:
   blender.humidity:
     measured: hum_sensors.chamber.humidity
-    law: { tag: PI, kp: 0.8, ki: 0.02, tt: 60 }
+    law: { type: PI, kp: 0.8, ki: 0.02, tt: 60 }
     default: true

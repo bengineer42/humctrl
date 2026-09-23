@@ -298,7 +298,7 @@ class SupplyConfig(BaseModel):
     wet: Humidity
 
 
-class DualPumpBlenderConfig(DriverConfig[DualPumpBlender], tag="dual_pump_blender"):
+class DualPumpBlenderConfig(DriverConfig[DualPumpBlender], type="dual_pump_blender"):
     """Two channels of one PWM chip, blended by `commit`.
 
     The pumps write duties through the `PwmLink` protocol (flyball-linux's

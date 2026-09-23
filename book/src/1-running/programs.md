@@ -90,7 +90,7 @@ A few things worth noticing:
   "message"` is short for `prompt: {message: "message"}`.
 - **`command`'s `device_command`**, not `command` — the step's own tag
   already uses that word — calls one of `blender`'s own commands exactly
-  as `POST /api/devices/blender/commands/{tag}` would. `flows.dry`/`wet`
+  as `POST /api/devices/blender/commands/{command}` would. `flows.dry`/`wet`
   and `efforts.dry`/`wet` are readbacks, not writable signals, so driving
   them by hand goes through `set_flows`/`set_efforts` (a `command` step),
   not `set` — a `set` step only reaches a device's writable (`[RPW]`)
