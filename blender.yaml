@@ -14,6 +14,11 @@
 
 runner:
   port: 8001
+  # Ben, 23 Sep: a placeholder until real credentials land with flyball's Go-front auth.
+  # Without it, flyball's secure-defaults (D-028) keeps the runner off the LAN.
+  # Plain HTTP: this password crosses the network in cleartext.
+  auth:
+    password: change-me
   run:
     serve_ui: ":8000"
     uv: true
