@@ -24,7 +24,7 @@ per input. People run its commands, which drive the lines at once.
 
 `flows.*`, `efforts.*` and `blend.wet_fraction` are declared `access=Access.RP`
 (readable and published, not writable): `commit` only ever reads `humidity`'s
-`.pending`, so a direct write to one of these would be accepted and
+`.staged`, so a direct write to one of these would be accepted and
 silently dropped -- the pumps would never move. The generic signal editor
 reads a signal's access from its spec, so declaring them this way is
 enough to stop it offering a write control for them; drive the lines

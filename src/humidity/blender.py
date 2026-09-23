@@ -131,7 +131,7 @@ class DualPumpBlender(Committable):
     humidity = Demand("humidity", "Target humidity", HUMIDITY, limits=(dry_supply, wet_supply))
     """Clamped to what the lines can mix: the supply humidities, as they read now."""
     # Readbacks only: `set_flows`/`set_efforts` are the only way to move these -- see
-    # `commit`, which never looks at their `.pending`. Not `access=Access.RPW`'s default for
+    # `commit`, which never looks at their `.staged`. Not `access=Access.RPW`'s default for
     # a Demand, so the generic signal editor does not offer a direct write that would be
     # silently accepted and never reach the pumps.
     dry_flow = flows.demand(
@@ -150,7 +150,7 @@ class DualPumpBlender(Committable):
     blend = Namespace("blend", "Blend")
     blend_flow = blend.setting("flow", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
     # Readback only: `set_fraction` is the only way to move it -- see `commit`, which never
-    # looks at its `.pending`.
+    # looks at its `.staged`.
     wet_fraction = blend.demand(
         "wet_fraction", "Wet fraction", WET_FRACTION, limits=(0.0, 1.0), access=Access.RP
     )
@@ -181,7 +181,7 @@ class DualPumpBlender(Committable):
 
     def commit(self, time_ns: int) -> None:
         """A humidity demand starts blending; while blending, a moved supply re-blends."""
-        if (target := self.humidity.pending) is not None:
+        if (target := self.humidity.staged) is not None:
             self._target = target
             if self.mode.value is not Mode.BLEND:
                 self.mode.push(Mode.BLEND, time_ns)

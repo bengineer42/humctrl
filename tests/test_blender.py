@@ -197,7 +197,7 @@ class TestCommands:
         rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
         rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 5.0})])
         assert dry.calls == [0.2], "not in BLEND: the supply reading does not re-blend"
-        rig.demand(blender.root, {"humidity": 50.0})
+        rig.write(blender.root, {"humidity": 50.0})
         assert blender.mode.value is Mode.BLEND and len(dry.calls) == 2
 
     def test_set_humidity_blends_by_hand_and_takes_the_controller_to_manual(
@@ -266,7 +266,7 @@ class TestSupplyLimits:
         rig.bind_inputs(blender, {"dry": dry_h.address})
         rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 25.0})])
         assert blender.humidity.limits == (25.0, 90.0), "the bound dry line, the wet default"
-        states = rig.demand(blender.root, {"humidity": 5.0})
+        states = rig.write(blender.root, {"humidity": 5.0})
         assert states[blender.humidity].value == pytest.approx(25.0)
         assert states[blender.humidity].requested == pytest.approx(5.0)
         assert states[blender.humidity].at_limit == Limit.LOW
@@ -276,7 +276,7 @@ class TestFlowsAndEffortsNotDirectlyWritable:
     """`efforts.*`/`flows.*`/`blend.wet_fraction` are readbacks.
 
     A dashboard write must be refused, not silently accepted and dropped --
-    see `DualPumpBlender.commit`, which never reads their `.pending`.
+    see `DualPumpBlender.commit`, which never reads their `.staged`.
     """
 
     @pytest.mark.parametrize(
@@ -286,7 +286,7 @@ class TestFlowsAndEffortsNotDirectlyWritable:
         self, rig: Any, blender: DualPumpBlender, address: str
     ) -> None:
         with pytest.raises(ConflictError, match="not writable"):
-            rig.demand(blender.root, {address: 0.5})
+            rig.write(blender.root, {address: 0.5})
 
     def test_set_efforts_still_moves_the_pumps(
         self,
@@ -319,7 +319,7 @@ class TestRail:
     def test_a_target_outside_the_supply_span_rails_and_is_reported_at_limit(
         self, rig: Any, blender: DualPumpBlender
     ) -> None:
-        states = rig.demand(
+        states = rig.write(
             blender.root, {"humidity": 200.0}
         )  # clamped to 100 by `limits`, still outside 10-90
         assert states[blender.humidity].at_limit == "high"
