@@ -103,12 +103,12 @@ A few things worth noticing:
 flyball program check programs/demo.yaml           # validates against the live rig: names a missing tuning or controller
 flyball program run programs/demo.yaml
 flyball program status
-flyball program stop                                # interrupt
+flyball program cancel                              # it ends `cancelled`; outputs are kept
 ```
 
-`flyball program run FILE [--interrupt]` sends the file's document to
+`flyball program run FILE [--cancel]` sends the file's document to
 `POST /api/programs/run`; the rig normalises it and applies the first
-step before answering. `--interrupt` stops whatever is already running
+step before answering. `--cancel` cancels whatever is already running
 first — without it, a program already running refuses a second. At real
 time this program takes roughly 25 rig-minutes; `flyball-runner rig-multi-sensor.yaml
 sim.yaml --set clock.speed=6` runs the simulated clock at 6×, about four
