@@ -3,7 +3,7 @@
 *Running this rig's programs — the general vocabulary, with a worked tour of the rig's own `programs/demo.yaml`.*
 
 There is no humidity-specific program vocabulary: `regulate`, `ramp`,
-`hold`, `arrive`, `manual`, `set`, `command` and `wait` are flyball's own
+`wait`, `settle`, `manual`, `set`, `command` and `prompt` are flyball's own
 steps, and this rig uses them exactly as any other rig would — naming
 `blender.humidity` (the controller) or `blender` (the device) where a
 step needs one. Every step below names the controller by its field, which
@@ -19,43 +19,43 @@ used.
 on start, so this one is already in the library once the runner is up.
 It's a tour of the rig for the simulator — manual pumps, closed-loop
 regulation under each of the two stored [tunings](../2-config/index.md#tunings),
-ramps paced two different ways, an unwaited ramp caught by `arrive`, and
-an operator wait:
+ramps paced two different ways, an unwaited ramp caught by `settle`, and
+an operator prompt:
 
 ```yaml
 name: demo
 description: >-
   Manual pumps, P then PID regulation, ramps, an unwaited ramp caught by
-  arrive, an operator wait.
+  settle, an operator prompt.
 steps:
   # --- by hand: the controller stays manual, the blender's commands drive the pumps ---
   - command: { device: blender, device_command: set_flows, args: { dry: 2, wet: 2 } }
-  - hold: { minutes: 2, message: "2 L/min each way: the chamber heads for the midpoint of the supplies" }
+  - wait: { duration: { minutes: 2 }, message: "2 L/min each way: the chamber heads for the midpoint of the supplies" }
   - command: { device: blender, device_command: set_efforts, args: { dry: 0.1, wet: 0.9 } }
-  - hold: { minutes: 2, message: "wet-heavy efforts: humidity climbs" }
+  - wait: { duration: { minutes: 2 }, message: "wet-heavy efforts: humidity climbs" }
   - command: { device: blender, device_command: stop }
-  - hold: { minutes: 1, message: "pumps stopped: drifting back towards ambient" }
+  - wait: { duration: { minutes: 1 }, message: "pumps stopped: drifting back towards ambient" }
 
   # --- closed loop: P first, then PID ---
   - regulate: { setpoint: 60, tuning: gentle }
-  - arrive: { within: 1, readings: 5, timeout: { minutes: 8 }, message: "settling at 60 under P" }
-  - hold: { minutes: 1, message: "holding 60 under P: expect a steady offset" }
+  - settle: { within: 1, count: 5, timeout: { minutes: 8 }, message: "settling at 60 under P" }
+  - wait: { duration: { minutes: 1 }, message: "holding 60 under P: expect a steady offset" }
   - regulate: { setpoint: 60, tuning: brisk }
-  - hold: { minutes: 2, message: "same setpoint, PID: the integrator closes the offset" }
+  - wait: { duration: { minutes: 2 }, message: "same setpoint, PID: the integrator closes the offset" }
 
   # --- ramps: paced by rate, then by duration ---
   - ramp: { to: 30, per_minute: 10 }
-  - hold: { minutes: 1, message: "dry soak at 30" }
+  - wait: { duration: { minutes: 1 }, message: "dry soak at 30" }
   - ramp: { to: 75, minutes: 3, wait: false }
-  - hold: { minutes: 1, message: "ramp to 75 running unattended" }
-  - arrive: { within: 1.5, readings: 3, timeout: { minutes: 8 }, message: "catching the ramp" }
-  - hold: { minutes: 1, message: "wet soak at 75" }
+  - wait: { duration: { minutes: 1 }, message: "ramp to 75 running unattended" }
+  - settle: { within: 1.5, count: 3, timeout: { minutes: 8 }, message: "catching the ramp" }
+  - wait: { duration: { minutes: 1 }, message: "wet soak at 75" }
 
   # --- the operator ---
-  - wait:
+  - prompt:
       message: "Kick the chamber if you like (a disturbance, a supply change), then press go"
       timeout: { minutes: 5 }
-  - arrive: { within: 1, readings: 5, timeout: { minutes: 8 }, message: "recovering" }
+  - settle: { within: 1, count: 5, timeout: { minutes: 8 }, message: "recovering" }
 
   # --- back to manual, pumps off ---
   - manual: blender.humidity
@@ -64,19 +64,30 @@ steps:
 
 A few things worth noticing:
 
-- **`hold`'s `duration` is the primary field, folded flat**: `hold:
-  {minutes: 2, message: "…"}` sets `duration` directly from `minutes`
-  (`Duration` takes any of its unit keys — `seconds`, `minutes`, `hours`,
-  … — or a bare number of seconds) rather than nesting `duration:
-  {minutes: 2}`. `ramp`'s `pace` folds the same way when it's a
-  `Duration` (`minutes: 3` alongside `to`) or a `Speed` (`per_minute: 10`)
-  — either reads directly onto the one pace field.
-- **`arrive`'s `timeout` doesn't fold**, because `loop` — not `timeout` —
-  is `arrive`'s primary field, so `timeout: {minutes: 8}` stays nested.
+- **`wait`'s `duration` folds flat only when the step has no `message`.**
+  Bare, `wait: {minutes: 2}` (or plain `wait: 120`) sets `duration`
+  directly from `minutes` (`Duration` takes any of its unit keys —
+  `seconds`, `minutes`, `hours`, … — or a bare number of seconds). The
+  demo's waits all carry a `message`, so each writes `duration:` out
+  explicitly instead: `wait: {duration: {minutes: 2}, message: "…"}`.
+  `wait: {minutes: 2, message: "…"}` is refused — "a prompt is now
+  `prompt:`; for a timed wait with a message write `duration:`
+  explicitly" — because that flat spelling is exactly what an old
+  operator prompt with a flat timeout used to look like. `ramp`'s `pace`
+  has no such exception: it folds the same way whether or not other
+  arguments are given (`minutes: 3` alongside `to`, or a `Speed`
+  `per_minute: 10`) — either reads directly onto the one pace field.
+- **`timeout` never folds, in any step.** It is always written nested,
+  `timeout: {minutes: 8}`, whatever the step's own primary field is: it is
+  set aside before folding is even considered. `wait`'s `duration` is the
+  one time field left once `timeout` is set aside (and `message` is
+  absent); `settle` has no other foldable time field at all — `loop` is
+  its primary — so its `timeout` stays nested the same way `prompt`'s
+  does.
 - **`manual: blender.humidity`** is the bare-scalar form: `manual`'s only
   field, `loop`, is primary, so naming just a controller (with nothing
-  else to set) can be the step's whole value, the same way `wait:
-  "message"` is short for `wait: {message: "message"}`.
+  else to set) can be the step's whole value, the same way `prompt:
+  "message"` is short for `prompt: {message: "message"}`.
 - **`command`'s `device_command`**, not `command` — the step's own tag
   already uses that word — calls one of `blender`'s own commands exactly
   as `POST /api/devices/blender/commands/{tag}` would. `flows.dry`/`wet`

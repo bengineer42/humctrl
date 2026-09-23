@@ -22,8 +22,8 @@
 # Sized for the demo (`programs/demo.yaml`) at `clock: { speed: 6 }`: a 3 L
 # chamber at up to 2 L/min a line gives tau = V/Q of 1.5 min at one line
 # full, close enough to `rig-multi-sensor.yaml`'s PI tuning (`kp: 0.8, ki: 0.02, tt: 60`)
-# that it still settles well inside the demo's `arrive` timeouts, while a
-# 2-minute hold shows real, visible movement rather than a flat line.
+# that it still settles well inside the demo's `settle` timeouts, while a
+# 2-minute wait shows real, visible movement rather than a flat line.
 
 name: humidity-sim
 clock: { speed: 1 }
