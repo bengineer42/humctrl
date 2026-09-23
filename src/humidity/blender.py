@@ -149,7 +149,11 @@ class DualPumpBlender(Committable):
     mode = Output("mode", "Mode", vtype=Mode, initial=Mode.MANUAL)
     blend = Namespace("blend", "Blend")
     blend_flow = blend.setting("flow", "Blend flow", vtype=BlendFlow, initial=DefaultBlendFlow)
-    wet_fraction = blend.demand("wet_fraction", "Wet fraction", WET_FRACTION, limits=(0.0, 1.0))
+    # Readback only: `set_fraction` is the only way to move it -- see `commit`, which never
+    # looks at its `.pending`.
+    wet_fraction = blend.demand(
+        "wet_fraction", "Wet fraction", WET_FRACTION, limits=(0.0, 1.0), access=Access.RP
+    )
 
     def __init__(
         self,

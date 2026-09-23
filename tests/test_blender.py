@@ -33,7 +33,7 @@ from humidity.blender import (
     calculate_wet_fraction,
 )
 from humidity.pumps import DualPumps, MaxFlows, PumpPair, PwmPump, SupplyHumidities
-from humidity.units import HUMIDITY, Flow
+from humidity.units import HUMIDITY, WET_FRACTION, Flow
 
 
 def test_flow_alias_carries_unit_and_quantity_in_the_schema() -> None:
@@ -120,7 +120,9 @@ class TestTree:
         assert roles["expected_humidity"] == (Role.OUTPUT, Access.RP)
         assert roles["mode"] == (Role.OUTPUT, Access.RP)
         assert roles["blend.flow"] == (Role.SETTING, Access.RP)
-        assert roles["blend.wet_fraction"] == (Role.DEMAND, Access.RPW)
+        assert roles["blend.wet_fraction"] == (Role.DEMAND, Access.RP), (
+            "readback only: set_fraction is the only way to move it"
+        )
         assert roles["max_flows.dry"] == (Role.CONFIG, Access.R)
         assert blender.signals["flows.dry"].tags == {"line": "dry"}
         assert blender.signals["efforts.wet"].tags == {"line": "wet"}
@@ -271,11 +273,14 @@ class TestSupplyLimits:
 
 
 class TestFlowsAndEffortsNotDirectlyWritable:
-    """`efforts.*`/`flows.*` are readbacks: a dashboard write must be refused, not silently
-    accepted and dropped -- see `DualPumpBlender.commit`, which never reads their `.pending`.
+    """`efforts.*`/`flows.*`/`blend.wet_fraction` are readbacks: a dashboard write must be
+    refused, not silently accepted and dropped -- see `DualPumpBlender.commit`, which never
+    reads their `.pending`.
     """
 
-    @pytest.mark.parametrize("address", ["efforts.dry", "efforts.wet", "flows.dry", "flows.wet"])
+    @pytest.mark.parametrize(
+        "address", ["efforts.dry", "efforts.wet", "flows.dry", "flows.wet", "blend.wet_fraction"]
+    )
     def test_a_direct_write_is_refused(
         self, rig: Any, blender: DualPumpBlender, address: str
     ) -> None:
@@ -295,6 +300,18 @@ class TestFlowsAndEffortsNotDirectlyWritable:
         assert blender.dry_effort.value == pytest.approx(0.3), (
             "the command still updates the readback"
         )
+
+    def test_set_fraction_still_moves_the_pumps_and_links_its_argument(
+        self, rig: Any, blender: DualPumpBlender
+    ) -> None:
+        rig.run_command(blender, "set_fraction", {"wet_fraction": 0.75})
+        assert blender.wet_fraction.value == pytest.approx(0.75), (
+            "the command still updates the readback"
+        )
+        param = DualPumpBlender.commands["set_fraction"].params["wet_fraction"]
+        assert param.link == "blend.wet_fraction"
+        assert blender.wet_fraction.quantity == WET_FRACTION
+        assert blender.wet_fraction.limits == (0.0, 1.0)
 
 
 class TestRail:
