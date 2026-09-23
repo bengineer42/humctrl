@@ -15,7 +15,7 @@ authors = [{ name = "Ben Laurence" }]
 # extensions/ restructure; the PWM link/chip is still flyball-linux's.
 # This rig has no hardware driver of its own left, only dual_pump_blender
 # (its split-range arithmetic) and sim_humidity_chamber (its simulated plant).
-dependencies = ["flyball[web]", "flyball-linux[i2c]", "flyball-chips"]
+dependencies = ["flyball[server]", "flyball-linux[i2c]", "flyball-chips"]
 
 # Not for PyPI: this is one rig's application, not a library. MIT still
 # governs the code -- the classifier only stops an accidental upload.
@@ -42,11 +42,12 @@ humidity = "humidity.configs"
 # still happening to sit nested inside a flyball checkout. Bump the rev by hand when flyball
 # moves and this needs to follow.
 #
-# Pinned to `dev`'s tip: `--serve-ui`/`--uv` (flyball run) and RunnerConfig.run (runner.run
-# YAML defaults for those flags, see README/book) all merged there 22 Sep.
-flyball = { git = "https://github.com/bengineer42/flyball", rev = "7fde9ee1c50c6921cbf4fd522f1432908cd80a58", subdirectory = "engine" }
-flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "7fde9ee1c50c6921cbf4fd522f1432908cd80a58", subdirectory = "extensions/linux" }
-flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "7fde9ee1c50c6921cbf4fd522f1432908cd80a58", subdirectory = "extensions/chips" }
+# Pinned to `main`'s tip (23 Sep): flyball went MIT, `dev-merge` was pushed to `dev` and
+# `main` together, and the `web` extra became `server` -- hence `flyball[server]` above.
+# An older rev does not have that extra, so the two must move together.
+flyball = { git = "https://github.com/bengineer42/flyball", rev = "62733c3c0ff90b10cdcc345b6483a9f9ce350ef7", subdirectory = "engine" }
+flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "62733c3c0ff90b10cdcc345b6483a9f9ce350ef7", subdirectory = "extensions/linux" }
+flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "62733c3c0ff90b10cdcc345b6483a9f9ce350ef7", subdirectory = "extensions/chips" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]
