@@ -42,12 +42,12 @@ humidity = "humidity.configs"
 # still happening to sit nested inside a flyball checkout. Bump the rev by hand when flyball
 # moves and this needs to follow.
 #
-# Pinned to `main`'s tip (23 Sep): flyball went MIT, `dev-merge` was pushed to `dev` and
-# `main` together, and the `web` extra became `server` -- hence `flyball[server]` above.
-# An older rev does not have that extra, so the two must move together.
-flyball = { git = "https://github.com/bengineer42/flyball", rev = "62733c3c0ff90b10cdcc345b6483a9f9ce350ef7", subdirectory = "engine" }
-flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "62733c3c0ff90b10cdcc345b6483a9f9ce350ef7", subdirectory = "extensions/linux" }
-flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "62733c3c0ff90b10cdcc345b6483a9f9ce350ef7", subdirectory = "extensions/chips" }
+# Pinned to `dev`'s tip (23 Sep, bcec29c): signal-faults wave 0 -- rig-file limits narrow the
+# driver's, a held controller freezes, the blender's inner demands are readbacks. Needs the
+# `server` extra (renamed from `web` at 62733c3), hence `flyball[server]` above.
+flyball = { git = "https://github.com/bengineer42/flyball", rev = "bcec29c9952b5533b12e136b40afc77a522a8a5f", subdirectory = "engine" }
+flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "bcec29c9952b5533b12e136b40afc77a522a8a5f", subdirectory = "extensions/linux" }
+flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "bcec29c9952b5533b12e136b40afc77a522a8a5f", subdirectory = "extensions/chips" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]
