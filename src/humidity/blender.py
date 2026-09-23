@@ -242,7 +242,8 @@ class DualPumpBlender(Committable):
     def set_humidity(self, humidity: Humidity, blend_flow: BlendFlow | None = None) -> None:
         """Blend to a humidity at a blend flow, by hand: the controller, if any, goes to manual.
 
-        Either left out keeps its current value. What a controller does
+        Either argument left out is filled from its current reading (the
+        target's, or `blend.flow`'s) and re-applied. What a controller does
         through the `humidity` demand, done in one go from a program or a form.
         """
         self._target = humidity
@@ -250,7 +251,8 @@ class DualPumpBlender(Committable):
 
     @command(mode=Mode.MANUAL, interrupts=True)
     def set_fraction(self, blend_flow: BlendFlow, wet_fraction: float) -> None:
-        """Blend at a wet fraction by hand, at a blend flow; either left out keeps its value."""
+        """Blend at a wet fraction by hand, at a blend flow; either argument left out is filled
+        from its current reading (`blend.flow`'s, or `blend.wet_fraction`'s) and re-applied."""
         self._set_blend(None, blend_flow, wet=wet_fraction)
 
     @command(mode=Mode.MANUAL, interrupts=True)

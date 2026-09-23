@@ -48,26 +48,18 @@ of the last polled value.
 
 ## Drive a pump by hand
 
-`flows.dry` and `flows.wet` are ordinary demands, independent of each
-other — set one at a time:
-
-```
-flyball demand blender.flows.dry 0.2
-flyball demand blender.flows.wet 0.2
-```
-
-or both at once with the `set_flows` command, if you want them to land
-together rather than as two separate writes:
+`flows.dry`/`flows.wet` are readbacks, not directly writable — `flyball
+demand blender.flows.dry 0.2` is refused (409). Drive both lines at once
+with the `set_flows` command instead:
 
 ```
 flyball invoke blender set_flows dry=0.2 wet=0.2
 ```
 
-`blend_flow`, by contrast, isn't `together` with anything, so it takes a
-plain single-signal demand:
+or by effort, 0–1 of full, with `set_efforts`:
 
 ```
-flyball demand blender.blend_flow 1.2
+flyball invoke blender set_efforts dry=0.3 wet=0.3
 ```
 
 ## Set a target humidity

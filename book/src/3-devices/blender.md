@@ -19,16 +19,16 @@ per input. People run its commands, which drive the lines at once.
 | `expected_humidity` | output | what the current pump outputs should actually deliver |
 | `mode` | output | `blend` (a humidity demand) or `manual` (the last command by hand) |
 | `blend.flow` | setting | the flow a `humidity` demand mixes to; `set_blend` |
-| `blend.wet_fraction` | demand | the share drawn from the wet line: the readback while blending; `set_fraction` sets it directly |
+| `blend.wet_fraction` | demand, read-only | the share drawn from the wet line: the readback while blending, set only by `set_fraction` -- not directly writable |
 | `max_flows.dry`, `max_flows.wet` | config | each line's maximum, the limit of its flow demand |
 
-`flows.*` and `efforts.*` are declared `access=Access.RP` (readable and
-published, not writable): `commit` only ever reads `humidity`'s
+`flows.*`, `efforts.*` and `blend.wet_fraction` are declared `access=Access.RP`
+(readable and published, not writable): `commit` only ever reads `humidity`'s
 `.pending`, so a direct write to one of these would be accepted and
 silently dropped -- the pumps would never move. The generic signal editor
 reads a signal's access from its spec, so declaring them this way is
 enough to stop it offering a write control for them; drive the lines
-through `set_flows`/`set_efforts` instead.
+through `set_flows`/`set_efforts`/`set_fraction` instead.
 
 The mode decides what a delivery does. A `humidity` demand puts the
 blender in `blend`, where a moved supply reading re-blends; `set_flows`,
@@ -100,7 +100,8 @@ actual output and the current supply humidities.
 - `set_humidity(humidity, blend_flow)` blends to a target by hand, at a
   blend flow, in one go — what a controller does through the `humidity`
   demand; `set_flows` and `set_efforts` take one value per line. An
-  argument left out keeps its current value. They are refused while a controller drives
+  argument left out is filled from its linked signal's current reading and
+  re-applied. They are refused while a controller drives
   `humidity` (put it in manual, or detach it); `stop` is exempt and stops
   both pumps at once, whatever is driving them.
 
