@@ -74,7 +74,7 @@ device each: the split-range maths is its own, so one PWM chip link
 ## Following the supply lines
 
 ```yaml
-bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
+inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 ```
 
 The blender declares two inputs, `dry` and `wet` (`supply.input(...)` in
@@ -115,7 +115,7 @@ blender:
   dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
   wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
   blend_flow: 1.0
-  bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
+  inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 ```
 
 `link` names a PWM chip link (`pwm0: { type: pwm, chip: 0 }`, from
@@ -124,5 +124,5 @@ blender:
 pump doesn't turn) and a max flow. The driver also takes a `frequency_hz`
 (default 20 000 Hz), the PWM carrier both lines share. A rig with no
 sensor bound to `dry`/`wet` may give a starting `supply: { dry: …, wet: …
-}` instead of `bound` — see `DualPumpBlenderConfig.supply` in
+}` instead of `inputs` — see `DualPumpBlenderConfig.supply` in
 `blender.py`.

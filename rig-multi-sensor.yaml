@@ -43,7 +43,7 @@ devices:
         signals: { humidity: { label: Wet line humidity }, temperature: { label: Wet line temperature } }
 
   blender:                                 # declared in blender.yaml; here only what this rig adds
-    bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }   # read the supply lines
+    inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }   # read the supply lines
 
 controllers:
   blender.humidity:

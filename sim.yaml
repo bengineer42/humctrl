@@ -74,7 +74,7 @@ devices:
     dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min; channel matches DRY_CHANNEL
     wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }   # L/min; channel matches WET_CHANNEL
     blend_flow: 1.0
-    bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
+    inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 
 # blender.humidity -> hum_sensors.chamber.humidity: the same addresses as
 # rig-multi-sensor.yaml, so its controllers entry needs no override here.

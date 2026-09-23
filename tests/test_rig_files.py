@@ -93,7 +93,7 @@ def test_the_overlay_mirrors_every_signal_rig_yaml_and_sim_yaml_both_declare() -
 def test_the_default_controller_settles_the_chamber_towards_its_reference() -> None:
     clock = SteppedClock(0)
     # The chamber's own drift/noise is zeroed here for a deterministic settle -- it feeds
-    # the real blender's `bound` supply readings, same as a real sensor's drift would.
+    # the real blender's `inputs` supply readings, same as a real sensor's drift would.
     rig = load_rig_config(
         [ROOT / "rig-multi-sensor.yaml", ROOT / "sim.yaml"],
         sets=[

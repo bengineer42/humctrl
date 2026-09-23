@@ -65,7 +65,7 @@ writable") rather than silently dropped, because `commit` only ever reads
 device](blender.md). `expected_humidity` is what `commit` computes the
 blend should be delivering, published alongside the readbacks.
 
-`blender.bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }`
+`blender.inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }`
 means the blender *follows* the two supply sensors: whenever either
 publishes, `blender.observe` records the new supply humidity, ready for the
 next `commit` — no bus poll of its own for that half of the picture.

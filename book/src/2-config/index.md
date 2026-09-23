@@ -17,7 +17,7 @@
 
 The rig is two files: `blender.yaml` holds what every humidity rig shares — the
 PWM chip and the `dual_pump_blender` device on it — and each rig file `extends`
-it, adding its own sensors, the controller, and (here) `bound:` on the blender.
+it, adding its own sensors, the controller, and (here) `inputs:` on the blender.
 `rig-single-sensor.yaml` is the bring-up variant: one `sht4x` on the chamber,
 nothing bound, the blender assuming dry 0 %RH / wet 100 %RH. Shown merged:
 
@@ -52,7 +52,7 @@ devices:
     dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
     wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
     blend_flow: 1.0
-    bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }   # this file's own addition
+    inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }   # this file's own addition
 
 controllers:
   blender.humidity:
@@ -86,7 +86,7 @@ only `dual_pump_blender`'s split-range arithmetic and
   `pwm_channel` device each, since the split-range arithmetic is its own.
   A `frequency_hz` field (default 20 000 Hz) is also available,
   shared by both lines, if `rig-multi-sensor.yaml` needs to override it.
-- **`blender.bound`** wires the blender to follow the two supply sensors'
+- **`blender.inputs`** wires the blender to follow the two supply sensors'
   humidity directly — see [The blender device](../3-devices/blender.md#following-the-supply-lines).
 - **`controllers.blender.humidity`** is named by its output (`blender`'s
   `humidity` demand), regulates the chamber's published humidity (its
@@ -153,7 +153,7 @@ devices:
     dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
     wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }   # L/min
     blend_flow: 1.0
-    bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
+    inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 
 # blender.humidity -> hum_sensors.chamber.humidity: the same addresses as
 # rig-multi-sensor.yaml, so its controllers entry needs no override here.
@@ -181,7 +181,7 @@ class in both files, *every* one of its signals, units, access, limits and
 commands match exactly — `dry_flow`/`wet_flow`/`dry_effort`/`wet_effort`/
 `blend_flow`/`expected_humidity` are the blender's own bookkeeping (from
 its configured `max_flow`s and the supply humidity it observes through
-`bound`), not read back from the chamber, precisely as on the real rig. A
+`inputs`), not read back from the chamber, precisely as on the real rig. A
 program, dashboard or session built against `rig-multi-sensor.yaml` runs unchanged
 against the overlay.
 
@@ -206,7 +206,7 @@ by `seed`). The dry and wet supplies drift slowly — a sinusoid of
 ±`supply_drift_rh` over `supply_drift_period_s`, decorrelated by phase so
 they don't move in lockstep — and carry their own reading noise
 (`supply_noise_rh`); this drift feeds the *real* physics (the blender
-observes it through `bound`, same as a real sensor's drift would), not
+observes it through `inputs`, same as a real sensor's drift would), not
 just the display. Every temperature drifts the same slow way around
 `temperature_c` with its own noise (`temperature_noise_c`), the chamber's
 also warming a little under total flow (`flow_warming_c_per_lpm`).

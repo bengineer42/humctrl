@@ -2,7 +2,7 @@
 # The pump blender, shared by every humidity rig file (`extends: [blender.yaml]`):
 # the PWM chip it drives and the `dual_pump_blender` device on it. A rig file
 # adds what differs -- its sensors, the controller that regulates `blender.humidity`
-# from one of them, and (rig-multi-sensor.yaml) `bound:` so the blender reads the
+# from one of them, and (rig-multi-sensor.yaml) `inputs:` so the blender reads the
 # supply lines' humidity instead of assuming dry 0 %RH / wet 100 %RH.
 #
 # Not a rig on its own: `flyball-runner blender.yaml` has no sensor to regulate from.

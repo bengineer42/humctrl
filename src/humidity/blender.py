@@ -290,7 +290,7 @@ class PumpLineConfig(BaseModel):
 
 
 class SupplyConfig(BaseModel):
-    """The supply lines' humidity, when not followed from a sensor (`bound`)."""
+    """The supply lines' humidity, when not followed from a sensor (`inputs`)."""
 
     model_config = ConfigDict(extra="forbid")
 
