@@ -229,7 +229,7 @@ class TestCommands:
         controller.regulate(50.0, transfer=Transfer.COLD)
         rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
         assert not controller.mode.active(), "put in manual, with an event"
-        assert rig.recent[-1].kind == "interrupted"
+        assert rig.recent[-1].code == "interrupted"
         assert blender.mode.value is Mode.FLOWS
         controller.regulate(50.0, transfer=Transfer.COLD)
         assert blender.mode.value is Mode.HUMIDITY, "a humidity demand takes it back"

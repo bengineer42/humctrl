@@ -12,12 +12,14 @@ together.
 `Sht4xSet.read` — a bad CRC or a short reply
 (`HardwareError`, raised directly by `decode` in
 `flyball_chips.sht4x`), or an I2C bus error under it — the
-runtime's polling loop (`flyball.runtime.polling.Polling._read`) doesn't
-retry: it records an `offline` `Condition` (`Level.ERROR`, the exception's
-message) against the device, stops polling it, and emits an event. The
+runtime's polling loop (`flyball.rig.polling.Polling._read`) doesn't
+retry: it raises an `offline` condition (severity `error`, the exception's
+message) on the device in the rig's condition store, stops polling it, and
+the event log gets an `offline` event with `edge: raised`. The
 device stays offline — no more reads, no more samples, nothing publishing
 — until explicitly restarted (`POST /api/devices/hum_sensors/restart`),
-which clears the condition and resumes polling on the same period.
+which clears the condition (an `offline` event with `edge: cleared` and
+how long it lasted) and resumes polling on the same period.
 
 Because `hum_sensors` is three atomic namespaces read independently, a
 CRC failure on `wet` alone still takes the *whole device* offline, not
@@ -26,10 +28,14 @@ sees, whichever namespace was mid-transaction.
 
 ## A read that succeeds but is slow
 
-If a device's `read` takes longer than its own `poll_s`, the same
-`_read` records a `slow` `Condition` (`Level.WARNING`) instead — the
-device keeps polling, but something (a stretched I2C transaction, system
-load) is eating into the margin. Worth watching if `hum_sensors`' `poll_s:
+If a device's `read` takes longer than its own `poll_s` three reads in a
+row, the same `_read` raises a `slow` condition (severity `warning`)
+instead — the device keeps polling, but something (a stretched I2C
+transaction, system load) is eating into the margin. Only the `read` itself
+is timed, and the condition clears after five reads in a row at or under
+0.8 of the period, so a read that is slow now and then raises nothing. The
+device's run (`GET /api/devices/hum_sensors`) shows the last read's
+duration (`read_s`) and how many reads have overrun (`missed`). Worth watching if `hum_sensors`' `poll_s:
 1` starts showing this: the fixed conversion wait (§[the sensor
 device](../3-devices/sht4x.md#one-i2c-transaction-command-to-decode), ~8.3 ms
 at high precision) is a small fraction of a second, so a slow condition
