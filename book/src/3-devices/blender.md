@@ -14,13 +14,21 @@ per input. People run its commands, which drive the lines at once.
 | signal | role | what it is |
 | --- | --- | --- |
 | `humidity` | demand | the split-range target; a controller usually owns this |
-| `flows.dry`, `flows.wet` | demand | each line's flow, L/min: the readback, set by `set_flows` |
-| `efforts.dry`, `efforts.wet` | demand | each line's effort, 0–1 of full: the readback, set by `set_efforts` |
+| `flows.dry`, `flows.wet` | demand, read-only | each line's flow, L/min: the readback, set only by `set_flows` -- not directly writable |
+| `efforts.dry`, `efforts.wet` | demand, read-only | each line's effort, 0–1 of full: the readback, set only by `set_efforts` -- not directly writable |
 | `expected_humidity` | output | what the current pump outputs should actually deliver |
 | `mode` | output | `blend` (a humidity demand) or `manual` (the last command by hand) |
 | `blend.flow` | setting | the flow a `humidity` demand mixes to; `set_blend` |
 | `blend.wet_fraction` | demand | the share drawn from the wet line: the readback while blending; `set_fraction` sets it directly |
 | `max_flows.dry`, `max_flows.wet` | config | each line's maximum, the limit of its flow demand |
+
+`flows.*` and `efforts.*` are declared `access=Access.RP` (readable and
+published, not writable): `commit` only ever reads `humidity`'s
+`.pending`, so a direct write to one of these would be accepted and
+silently dropped -- the pumps would never move. The generic signal editor
+reads a signal's access from its spec, so declaring them this way is
+enough to stop it offering a write control for them; drive the lines
+through `set_flows`/`set_efforts` instead.
 
 The mode decides what a delivery does. A `humidity` demand puts the
 blender in `blend`, where a moved supply reading re-blends; `set_flows`,

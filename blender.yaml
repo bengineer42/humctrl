@@ -42,8 +42,8 @@ devices:
       supply: { dry: 36.5, wet: 88.5 }
     # signals the driver declares (no poll: it pushes from commit and its commands):
     #   humidity                 demand   %RH, limits [0, 100]  the split-range target; a controller's
-    #   flows.dry, flows.wet     demand   L/min                 readbacks; set by set_flows
-    #   efforts.dry, efforts.wet demand   0-1 of full           readbacks; set by set_efforts
+    #   flows.dry, flows.wet     demand   L/min    read-only readbacks; set only by set_flows
+    #   efforts.dry, efforts.wet demand   0-1 of full read-only readbacks; set only by set_efforts
     #   expected_humidity        output   %RH                   what the lines actually deliver
     #   mode                     output   blend|flows|efforts|stopped
     #   blend                    setting  the flow a humidity demand mixes to; set_blend
