@@ -40,9 +40,11 @@ here points at the bus or the host, not the sensor's own timing.
 These are refused before anything reaches the blender — a 409 from the
 API, or a raised `ConflictError` from a script — and change nothing:
 
-- **A `together` pair set in part.** `dry_flow` and `wet_flow` (and
-  `dry_effort`/`wet_effort`) must arrive in the same demand — "`'…dry_flow'
-  is set with wet_flow`". See [The blender device](../3-devices/blender.md).
+- **A direct demand on a readback.** `flows.dry`/`flows.wet`,
+  `efforts.dry`/`efforts.wet` and `blend.wet_fraction` are readbacks
+  (`[RP]`), not writable directly — "`'…flows.dry' [RP] is not
+  writable`". Drive them through `set_flows`/`set_efforts`/`set_fraction`
+  instead. See [The blender device](../3-devices/blender.md).
 - **A demand on a signal a controller drives.** `blender.humidity` while
   `blender.humidity` (the controller) is regulating — put it in `manual`
   first (a program step, or `POST /api/controllers/blender.humidity/manual`).
@@ -61,10 +63,10 @@ pumps — but the result isn't what was asked for:
   wet enough), not the controller.
 - **The requested flow exceeds what the blend can deliver**:
   `humidity.pumps.errors.FlowsOverdrivenError` — raised by
-  `DualPumps.set_flows`/`validate_flows` for a direct `dry_flow`/`wet_flow`
-  demand that exceeds a line's `max_flow`. A `humidity` demand instead
-  goes through `Absolute(flow, OnOverdrive.CLAMP)`, so `commit`'s own
-  split-range path derates to what's achievable rather than raising — see
+  `DualPumps.set_flows`/`validate_flows` for a `set_flows` command that
+  exceeds a line's `max_flow`. A `humidity` demand instead goes through
+  `Absolute(flow, OnOverdrive.CLAMP)`, so `commit`'s own split-range path
+  derates to what's achievable rather than raising — see
   [Limits](limits.md#flow).
 - **The two supply humidities aren't in order**:
   `humidity.blender.SupplyHumiditiesError` — `wet` must read (or be

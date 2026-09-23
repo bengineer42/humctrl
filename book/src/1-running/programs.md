@@ -28,10 +28,10 @@ description: >-
   Manual pumps, P then PID regulation, ramps, an unwaited ramp caught by
   arrive, an operator wait.
 steps:
-  # --- by hand: the controller stays manual, the blender takes demands directly ---
-  - set: { device: blender, values: { dry_flow: 2, wet_flow: 2 } }
+  # --- by hand: the controller stays manual, the blender's commands drive the pumps ---
+  - command: { device: blender, device_command: set_flows, args: { dry: 2, wet: 2 } }
   - hold: { minutes: 2, message: "2 L/min each way: the chamber heads for the midpoint of the supplies" }
-  - set: { device: blender, values: { dry_effort: 0.1, wet_effort: 0.9 } }
+  - command: { device: blender, device_command: set_efforts, args: { dry: 0.1, wet: 0.9 } }
   - hold: { minutes: 2, message: "wet-heavy efforts: humidity climbs" }
   - command: { device: blender, device_command: stop }
   - hold: { minutes: 1, message: "pumps stopped: drifting back towards ambient" }
@@ -77,13 +77,13 @@ A few things worth noticing:
   field, `loop`, is primary, so naming just a controller (with nothing
   else to set) can be the step's whole value, the same way `wait:
   "message"` is short for `wait: {message: "message"}`.
-- **`set`'s `device`/`values`** put a demand across several of `blender`'s
-  writable signals at once — `dry_flow`/`wet_flow` and
-  `dry_effort`/`wet_effort` are each `together` pairs, so both members
-  must be in the one `set` step.
 - **`command`'s `device_command`**, not `command` — the step's own tag
-  already uses that word — calls `blender.stop()` exactly as `POST
-  /api/devices/blender/commands/stop` would.
+  already uses that word — calls one of `blender`'s own commands exactly
+  as `POST /api/devices/blender/commands/{tag}` would. `flows.dry`/`wet`
+  and `efforts.dry`/`wet` are readbacks, not writable signals, so driving
+  them by hand goes through `set_flows`/`set_efforts` (a `command` step),
+  not `set` — a `set` step only reaches a device's writable (`[RPW]`)
+  signals.
 - Every `tuning: gentle`/`tuning: brisk` swaps `blender.humidity`'s law
   bumplessly before aiming, by the stem of a file under `tunings/`.
 

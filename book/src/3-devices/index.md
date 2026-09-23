@@ -45,21 +45,24 @@ One `dual_pump_blender` device, no namespaces — every signal is on its
 root. `rig-multi-sensor.yaml`'s own comment gives the tree the driver declares:
 
 ```yaml
-    # signals the driver declares:
-    #   humidity                [W]    %RH, limits [0, 100]   the split-range target
-    #   dry_flow, wet_flow      [RPW]  L/min, together        manual flows; also the readback
-    #   dry_effort, wet_effort  [RPW]  0-1 of full, together  manual efforts; also the readback
-    #   blend_flow               [RW]  L/min                  a setting: read on demand, not streamed
-    #   expected_humidity        [RP]  %RH                    what the lines actually deliver
+    # signals the driver declares (no poll: it pushes from commit and its commands):
+    #   humidity                 [RPW]  %RH, limits [0, 100]  the split-range target
+    #   flows.dry, flows.wet     [RP]   L/min                 readbacks; set only by set_flows
+    #   efforts.dry, efforts.wet [RP]   0-1 of full            readbacks; set only by set_efforts
+    #   blend.flow                [RP]  L/min                  a setting: re-set only by set_blend
+    #   blend.wet_fraction        [RP]  0-1                    readback; set only by set_fraction
+    #   expected_humidity         [RP]  %RH                    what the lines actually deliver
 ```
 
 `humidity` is the only signal a controller may drive — it's the split-range
 target, and `blender.humidity` is exactly that controller's name. The rest
-are for driving or reading the pumps directly: `dry_flow`/`wet_flow` and
-`dry_effort`/`wet_effort` are `together` pairs (a demand naming one alone is
-refused — "set with wet_flow"), `blend_flow` is a setting read on demand,
-and `expected_humidity` is what `commit` computes the blend should be
-delivering, published alongside the readbacks.
+are readbacks, `[RP]` not `[RPW]`: a direct demand on `flows.dry`,
+`efforts.wet`, `blend.wet_fraction` or `blend.flow` is refused ("not
+writable") rather than silently dropped, because `commit` only ever reads
+`humidity`'s pending value. Drive the lines through `set_flows`,
+`set_efforts`, `set_fraction` or `set_blend` instead — see [The blender
+device](blender.md). `expected_humidity` is what `commit` computes the
+blend should be delivering, published alongside the readbacks.
 
 `blender.bound: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }`
 means the blender *follows* the two supply sensors: whenever either

@@ -22,10 +22,12 @@ any control limit.
 ## Flow
 
 Each pump line is limited to its own `max_flow` (`rig-multi-sensor.yaml`: 2.0 L/min for
-both `dry` and `wet`). `dry_flow`/`wet_flow [RPW]` are clamped there
-directly; `blend_flow [RW]` (the total flow a `humidity` demand mixes to)
-is not itself limited by a signal range, but the resulting per-line flows
-still are.
+both `dry` and `wet`). `flows.dry`/`flows.wet [RP]` are clamped there
+directly, and (being readbacks, not writable) are only ever moved by
+`set_flows`, which clamps its own `dry`/`wet` arguments the same way;
+`blend.flow [RP]` (the total flow a `humidity` demand mixes to, a
+setting re-set only by `set_blend`) is not itself limited by a signal
+range, but the resulting per-line flows still are.
 
 The achievable *total* flow depends on the blend, not just on the two
 `max_flow`s: at a wet fraction `b`, `dry_flow = (1−b)·total ≤ dry_max` and
@@ -43,7 +45,8 @@ rather than raising.
 
 ## Effort and deadband
 
-`dry_effort`/`wet_effort [RPW]` are `[0, 1]` of full PWM drive.
+`efforts.dry`/`efforts.wet [RP]` are `[0, 1]` of full PWM drive, readbacks
+moved only by `set_efforts`.
 `deadband` (`rig-multi-sensor.yaml`: 0.05 for both lines) is the effort below which a
 line doesn't turn — `PwmPump.calculate_duty_ratio` maps `[0, 1]`
 effort onto `[deadband, 1]` duty, so effort 0 is genuinely off and any
