@@ -81,7 +81,7 @@ steps:
 flyball program run aim.yaml
 ```
 
-`setpoint: 45` means 45 %RH; `loop` is omitted, so it aims the rig's
+`setpoint: 45` means 45 %RH; `controllers` is omitted, so it aims the rig's
 default controller. `flyball status` (or `flyball watch controllers`)
 shows the chamber humidity moving towards it.
 

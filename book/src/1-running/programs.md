@@ -6,10 +6,9 @@ There is no humidity-specific program vocabulary: `regulate`, `ramp`,
 `wait`, `settle`, `manual`, `set`, `command` and `prompt` are flyball's own
 steps, and this rig uses them exactly as any other rig would — naming
 `blender.humidity` (the controller) or `blender` (the device) where a
-step needs one. Every step below names the controller by its field, which
-is still `loop` on the wire even though the concept is a *controller* — a
-writable signal has at most one controller, so naming `blender.humidity`
-means "the controller driving it". Every example omits `loop` where this
+step needs one. A step names the controller by its `controllers` field —
+a demand has at most one controller, so naming `blender.humidity` means
+"the controller driving it". Every example omits `controllers` where this
 rig has only one controller: the rig's `default: true` controller is
 used.
 
@@ -81,11 +80,11 @@ A few things worth noticing:
   `timeout: {minutes: 8}`, whatever the step's own primary field is: it is
   set aside before folding is even considered. `wait`'s `duration` is the
   one time field left once `timeout` is set aside (and `message` is
-  absent); `settle` has no other foldable time field at all — `loop` is
+  absent); `settle` has no other foldable time field at all — `controllers` is
   its primary — so its `timeout` stays nested the same way `prompt`'s
   does.
 - **`manual: blender.humidity`** is the bare-scalar form: `manual`'s only
-  field, `loop`, is primary, so naming just a controller (with nothing
+  field, `controllers`, is primary, so naming just a controller (with nothing
   else to set) can be the step's whole value, the same way `prompt:
   "message"` is short for `prompt: {message: "message"}`.
 - **`command`'s `device_command`**, not `command` — the step's own tag
