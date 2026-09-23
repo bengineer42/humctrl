@@ -22,8 +22,8 @@ def _drive(plant: HumidityChamber, channel: int, effort: float) -> None:
 
 
 def _settle(plant: HumidityChamber, seconds: float) -> None:
-    plant.advance(0)  # baseline: the first call never steps
-    plant.advance(round(seconds * 1e9))
+    plant.advance_to(0)  # baseline: the first call never steps
+    plant.advance_to(round(seconds * 1e9))
 
 
 def test_it_builds_a_multi_plant_and_a_pwm_link_with_six_named_outputs() -> None:
@@ -157,7 +157,7 @@ def test_supply_noise_perturbs_only_the_dry_and_wet_readings() -> None:
     plant = HumidityChamberConfig(
         dry_rh=10.0, wet_rh=90.0, supply_noise_rh=1.0, supply_drift_rh=0.0, seed=1
     ).build()
-    plant.advance(0)
+    plant.advance_to(0)
     readings = {round(plant.output("dry_humidity"), 3) for _ in range(20)}
     assert len(readings) > 1
 
@@ -170,10 +170,10 @@ def test_supply_drift_wanders_the_dry_and_wet_readings_out_of_phase() -> None:
         supply_drift_period_s=100.0,
         supply_noise_rh=0.0,
     ).build()
-    plant.advance(0)
+    plant.advance_to(0)
     assert plant.output("dry_humidity") == pytest.approx(10.0)
     assert plant.output("wet_humidity") == pytest.approx(95.0)  # a quarter-cycle ahead
-    plant.advance(25_000_000_000)  # a quarter of the period
+    plant.advance_to(25_000_000_000)  # a quarter of the period
     assert plant.output("dry_humidity") == pytest.approx(15.0)
     assert plant.output("wet_humidity") == pytest.approx(90.0)
 
@@ -191,17 +191,17 @@ def test_temperatures_drift_around_the_baseline_and_the_chamber_warms_with_flow(
         supply_drift_rh=0.0,
     )
     idle = HumidityChamberConfig(**common).build()
-    idle.advance(0)
+    idle.advance_to(0)
     expected_dry = 20.0 + 1.0 * math.sin(math.pi)  # dry's phase at t=0
     expected_chamber = 20.0 + 1.0 * math.sin(0.25 * math.pi)  # chamber's phase at t=0
     assert idle.output("dry_temperature") == pytest.approx(expected_dry)
     assert idle.output("chamber_temperature") == pytest.approx(expected_chamber)
 
     driven = HumidityChamberConfig(**common).build()
-    driven.advance(0)
+    driven.advance_to(0)
     _drive(driven, DRY_CHANNEL, 1.0)
     _drive(driven, WET_CHANNEL, 1.0)
-    # warming reads off the *commanded* flow directly; no advance needed.
+    # warming reads off the *commanded* flow directly; no advance_to needed.
     assert driven.output("chamber_temperature") == pytest.approx(
         expected_chamber + 2.0 * 4.0  # flow_warming_c_per_lpm * (dry + wet) flow
     )

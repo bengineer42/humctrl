@@ -18,7 +18,6 @@ from flyball.foundation.device import (
     Limit,
     Namespace,
     Readout,
-    Section,
     command,
 )
 from flyball.foundation.errors import UnachievableError
@@ -98,8 +97,9 @@ class Mode(Labelled):
     MANUAL = "manual", "Set by hand"
 
 
-DRY = Section("dry", "Dry line")
-WET = Section("wet", "Wet line")
+DRY = {"line": "dry"}
+WET = {"line": "wet"}
+"""Each line's signals share a `line` tag across the tree: `flows.dry`, `efforts.dry`, ..."""
 
 
 class DualPumpBlender(Committable):
@@ -120,13 +120,13 @@ class DualPumpBlender(Committable):
     humidities = Namespace("humidities", "Flow humidities")
     supply_defaults = Namespace("supply_defaults", "Supply humidities when unbound")
 
-    dry_max_flow = max_flows.config(DRY, "Dry max flow", FLOW)
-    wet_max_flow = max_flows.config(WET, "Wet max flow", FLOW)
-    dry_supply_default = supply_defaults.config(DRY, "Dry line humidity", HUMIDITY)
-    wet_supply_default = supply_defaults.config(WET, "Wet line humidity", HUMIDITY)
+    dry_max_flow = max_flows.config("dry", "Dry max flow", FLOW, tags=DRY)
+    wet_max_flow = max_flows.config("wet", "Wet max flow", FLOW, tags=WET)
+    dry_supply_default = supply_defaults.config("dry", "Dry line humidity", HUMIDITY, tags=DRY)
+    wet_supply_default = supply_defaults.config("wet", "Wet line humidity", HUMIDITY, tags=WET)
 
-    dry_supply = humidities.input(DRY, "Dry line humidity", HUMIDITY, default=dry_supply_default)
-    wet_supply = humidities.input(WET, "Wet line humidity", HUMIDITY, default=wet_supply_default)
+    dry_supply = humidities.input("dry", "Dry line humidity", HUMIDITY, default=dry_supply_default)
+    wet_supply = humidities.input("wet", "Wet line humidity", HUMIDITY, default=wet_supply_default)
 
     humidity = Demand("humidity", "Target humidity", HUMIDITY, limits=(dry_supply, wet_supply))
     """Clamped to what the lines can mix: the supply humidities, as they read now."""
@@ -135,13 +135,17 @@ class DualPumpBlender(Committable):
     # a Demand, so the generic signal editor does not offer a direct write that would be
     # silently accepted and never reach the pumps.
     dry_flow = flows.demand(
-        DRY, "Dry pump flow", FLOW, limits=(0.0, dry_max_flow), access=Access.RP
+        "dry", "Dry pump flow", FLOW, limits=(0.0, dry_max_flow), access=Access.RP, tags=DRY
     )
     wet_flow = flows.demand(
-        WET, "Wet pump flow", FLOW, limits=(0.0, wet_max_flow), access=Access.RP
+        "wet", "Wet pump flow", FLOW, limits=(0.0, wet_max_flow), access=Access.RP, tags=WET
     )
-    dry_effort = efforts.demand(DRY, "Dry pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP)
-    wet_effort = efforts.demand(WET, "Wet pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP)
+    dry_effort = efforts.demand(
+        "dry", "Dry pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP, tags=DRY
+    )
+    wet_effort = efforts.demand(
+        "wet", "Wet pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP, tags=WET
+    )
 
     expected_humidity = Readout(
         "expected_humidity", "Expected humidity", HUMIDITY, range=(0.0, 100.0), precision=1

@@ -34,8 +34,8 @@ The mode decides what a delivery does. A `humidity` demand puts the
 blender in `blend`, where a moved supply reading re-blends; `set_flows`,
 `set_efforts`, `set_fraction` and `stop` drive the lines at once and put
 it in `manual`, where a supply reading changes nothing, so a manual flow
-is not undone by the next reading. The `dry`/`wet`
-sections tag each line's signals across `flows`, `efforts` and
+is not undone by the next reading. A `line: dry`/`line: wet`
+tag groups each line's signals across `flows`, `efforts` and
 `max_flows`, so a UI can show the tree by line as well as by kind. The
 blender is never polled: it pushes its readbacks from `commit` and from
 its commands.

@@ -162,7 +162,7 @@ class HumidityChamber:
             return self._temperature(port, time_ns)
         raise ValueError(f"no output {port!r}; there are {self.output_names}")
 
-    def advance(self, time_ns: int) -> None:
+    def advance_to(self, time_ns: int) -> None:
         """Step the chamber to `time_ns`, in sub-steps short enough for the sensor lag."""
         if self._last_ns is not None and time_ns > self._last_ns:
             remaining = (time_ns - self._last_ns) / 1e9
