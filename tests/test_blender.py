@@ -273,9 +273,10 @@ class TestSupplyLimits:
 
 
 class TestFlowsAndEffortsNotDirectlyWritable:
-    """`efforts.*`/`flows.*`/`blend.wet_fraction` are readbacks: a dashboard write must be
-    refused, not silently accepted and dropped -- see `DualPumpBlender.commit`, which never
-    reads their `.pending`.
+    """`efforts.*`/`flows.*`/`blend.wet_fraction` are readbacks.
+
+    A dashboard write must be refused, not silently accepted and dropped --
+    see `DualPumpBlender.commit`, which never reads their `.pending`.
     """
 
     @pytest.mark.parametrize(

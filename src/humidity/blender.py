@@ -251,8 +251,11 @@ class DualPumpBlender(Committable):
 
     @command(mode=Mode.MANUAL, interrupts=True)
     def set_fraction(self, blend_flow: BlendFlow, wet_fraction: float) -> None:
-        """Blend at a wet fraction by hand, at a blend flow; either argument left out is filled
-        from its current reading (`blend.flow`'s, or `blend.wet_fraction`'s) and re-applied."""
+        """Blend at a wet fraction by hand, at a blend flow.
+
+        Either argument left out is filled from its current reading
+        (`blend.flow`'s, or `blend.wet_fraction`'s) and re-applied.
+        """
         self._set_blend(None, blend_flow, wet=wet_fraction)
 
     @command(mode=Mode.MANUAL, interrupts=True)
