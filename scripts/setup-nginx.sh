@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Installs nginx (if missing) and reverse-proxies it at the runner, so the
-# rig is reachable on :80 instead of directly on its own port. Idempotent,
-# safe to re-run -- installs nginx once, always rewrites the site config to
-# match the current args.
+# Installs nginx (if missing) and reverse-proxies it at `flyball run`'s front,
+# so the rig is reachable on :80 instead of on the front's own port.
+# Idempotent, safe to re-run -- installs nginx once, always rewrites the site
+# config to match the current args.
 #
 #   sudo ./scripts/setup-nginx.sh [--port PORT] [--server-name NAME]
 #
-# --port: the runner's own port (default 8000, flyball-runner's default;
-#   pass the same value you gave flyball-runner --port, if you did).
+# --port: the port `runner.front.listen` gives the front (default 8000, as
+#   blender.yaml sets it; the runner behind the front has no port to proxy).
 # --server-name: nginx server_name (default `_`, nginx's catch-all -- works
 #   for a bare IP or hostname with no DNS setup needed).
 #
-# The runner itself should stay bound to loopback only (flyball-runner's
-# own default, no --host flag) -- this script makes it reachable on the
-# network *through* nginx, not directly, so nginx is the only thing that
-# needs a firewall hole opened for it, if any.
+# The browser's Host is passed through (the front checks Host and Origin);
+# X-Forwarded-For is set, which the front believes only from a proxy in
+# `runner.front.trusted_proxies` -- add `[127.0.0.1]` in your deployment
+# overlay so each client, not nginx, counts for the sign-in limit.
 set -euo pipefail
 
 port=8000
@@ -48,6 +48,8 @@ server {
 
     location /ws/ {
         proxy_pass http://127.0.0.1:$port;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -55,6 +57,8 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:$port;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     }
 }
 CONF

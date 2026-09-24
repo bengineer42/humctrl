@@ -9,22 +9,19 @@
 # Not a rig on its own: `flyball-runner blender.yaml` has no sensor to regulate from,
 # and no supply humidities.
 #
-# runner.port is moved off flyball's default (8000) so `flyball run`'s embedded dashboard
-# (runner.run.serve_ui, below) can sit on :8000 instead without a bind collision -- see
-# book/src/2-config/runner.md in the flyball repo for what runner.run's keys do; they're
-# Go-CLI-only, flyball-runner itself never reads them.
+# runner.front is how `flyball run` serves the rig: the dashboard and the door on :8000, the
+# runner behind it on a socket, started through this project's venv (`uv`). `auth: password`
+# needs a `password:` -- a `$scrypt$` line from `flyball password` -- which is not kept here:
+# put it in a deployment overlay outside the checkout (book: 4-hardware/pi.md), with anything
+# else this one rig differs by, and run `flyball run rig-single-sensor.yaml ~/humidity-pi.yaml`.
+# Without one the front falls back to the local shape, on loopback only, and says why.
 
 runner:
-  port: 8001
-  # Ben, 23 Sep: a placeholder until real credentials land with flyball's Go-front auth.
-  # Without it, flyball's secure-defaults (D-028) keeps the runner off the LAN.
-  # Plain HTTP: this password crosses the network in cleartext.
-  auth:
-    password: change-me
-  run:
-    serve_ui: ":8000"
+  port: 8001                               # a bare `flyball-runner` only; under `flyball run` it is unused
+  front:
+    listen: ":8000"
+    auth: password
     uv: true
-    port: "8001"
 
 links:
   pwm0: { type: pwm, chip: 0 }

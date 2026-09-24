@@ -38,11 +38,17 @@ binary itself, no separate UI build/install needed:
 flyball run rig-multi-sensor.yaml
 ```
 
-No flags needed -- `blender.yaml` (shared by every rig file here) sets `runner.run.serve_ui`/
-`runner.run.uv` in the rig file itself, so `flyball run` already knows to serve the dashboard on
-`:8000` and launch via `uv run` (`flyball-runner` isn't on `$PATH` outside a project's own venv).
-Override any of it with the equivalent flag when you need to (`--serve-ui`, `--uv`, `--port`) --
-a CLI flag always wins over the rig file's own default.
+`blender.yaml` (shared by every rig file here) sets `runner.front`: the dashboard and the door on
+`:8000`, a password to get in, and the runner started through this project's venv (`uv`). The
+password itself -- a `$scrypt$` line from `flyball password` -- and anything else one machine
+differs by go in a deployment overlay outside the checkout, laid over the rig file:
+
+```sh
+flyball run rig-multi-sensor.yaml ~/humidity-pi.yaml
+```
+
+Without a password the front serves this machine only. The book's
+[Raspberry Pi setup](https://bengineer42.github.io/humctrl/4-hardware/pi/) has the overlay.
 
 See the [book](https://bengineer42.github.io/humctrl/) for hardware setup, wiring, first run,
 and the built-in humidity programs.

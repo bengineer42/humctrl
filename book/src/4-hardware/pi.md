@@ -9,7 +9,7 @@ pumps from its two hardware PWM channels. Nothing else on it is special.
 Flash Raspberry Pi OS Lite (64-bit) with the Raspberry Pi Imager; in its
 settings give the machine a hostname, a user, and enable SSH. Do not use a
 default password on a Pi that will sit on a network -- the daemon's own
-[door](https://bengineer42.github.io/flyball/latest/1-running/daemon/access/) is not a substitute for the
+[door](https://bengineer42.github.io/flyball/latest/1-running/runner/access/) is not a substitute for the
 machine's.
 
 ## I²C and PWM
@@ -53,35 +53,64 @@ sudo apt install git python3
 curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/bengineer42/humctrl.git && cd humctrl
 ./install.sh                             # uv, this package's deps, the flyball CLI, PWM/I2C (Pi detected)
-flyball run rig-multi-sensor.yaml        # the real rig, dashboard included
+flyball password                         # asks for a password, prints a $scrypt$ line
 ```
 
-No flags needed: `blender.yaml` sets `runner.run.serve_ui`/`runner.run.uv`/`runner.port` in the
-rig file itself (shared by every rig file here via `extends`), so `flyball run` already knows to
-serve the dashboard on `:8000` -- reverse-proxying `/api`/`/ws`/`/mcp` to the runner it starts on
-`:8001` -- and to launch it via `uv run` (`flyball-runner` isn't on `$PATH` outside this
-project's own venv). Override with the equivalent flag when you need to (`--serve-ui ADDR`,
-`--uv`, `--port`) -- a CLI flag always wins over the rig file's own default. `uv run
-flyball-runner rig-multi-sensor.yaml` (or `rig-multi-sensor.yaml sim.yaml` for the simulation)
-still works too, API/WebSocket only, no dashboard, if that's all you need.
+`blender.yaml`, which every rig file here extends, sets `runner.front`: the
+dashboard and the door on `:8000` for the whole network, `auth: password`,
+and the runner started through this project's venv (`uv: true`). What it
+does not hold is the password, or anything else only this Pi differs by.
+
+## This Pi's own settings
+
+Keep them in a deployment overlay **outside the checkout**, so a `git pull`
+never touches them and they never reach the repository. `flyball run` lays
+each rig file over the one before, key by key, so the overlay carries only
+what differs:
+
+```yaml
+# ~/humidity-pi.yaml -- this Pi only; not in git
+runner:
+  front:
+    password: $scrypt$…                  # the line `flyball password` printed
+    # trusted_proxies: [127.0.0.1]       # behind nginx on this Pi (below)
+devices:
+  blender:
+    dry: { deadband: 0.128, max_flow: 1.9 }   # this rig's pumps, measured
+    wet: { deadband: 0.081, max_flow: 2.0 }
+```
+
+```
+chmod 600 ~/humidity-pi.yaml
+flyball run rig-multi-sensor.yaml ~/humidity-pi.yaml
+```
+
+Put the rig file first: `flyball run` starts the runner from the first
+file's directory (the `uv` project) and keys its state by it. Without the
+overlay the rig still runs, but the front has no password and serves this
+Pi only (`127.0.0.1`), saying why. The pump values are what
+[Pumps](pumps.md) says to measure: the duty where each pump's flow line
+crosses zero, and its flow at full duty.
 
 `flyball-linux` needs no compiled extensions for I²C and PWM (it talks to
 the kernel interfaces directly), so `uv sync` (part of `install.sh`) on the Pi is a few
 minutes, mostly downloading. A token, a sub-path, running under systemd: the
-flyball book's [Starting a rig](https://bengineer42.github.io/flyball/latest/1-running/daemon/).
+flyball book's [Starting a rig](https://bengineer42.github.io/flyball/latest/1-running/runner/)
+and [Access](https://bengineer42.github.io/flyball/latest/1-running/runner/access/).
 
 ## nginx
 
-`scripts/setup-nginx.sh` reverse-proxies port 80 at `flyball run --serve-ui` (installing
+`scripts/setup-nginx.sh` reverse-proxies port 80 at the front (installing
 nginx if needed), so the rig is reachable without naming its port:
 
 ```
-sudo ./scripts/setup-nginx.sh                                # --serve-ui on :8000, the default
-sudo ./scripts/setup-nginx.sh --port 8001 --server-name humidity.local
+sudo ./scripts/setup-nginx.sh                                # the front on :8000, the default
+sudo ./scripts/setup-nginx.sh --port 8080 --server-name humidity.local
 ```
 
-Point nginx at the *same* port `--serve-ui` is bound to, not the raw runner's port -- the raw
-`flyball-runner` process has no dashboard of its own to serve (that's what `--serve-ui` adds),
-so nginx proxying straight to it would show the same blank page this setup used to. The runner
-itself should stay bound to loopback only (its own default, no `--host` flag) -- nginx is then
-the only thing that needs a network route to it, not the runner directly.
+Point nginx at the port `runner.front.listen` gives the front -- the runner
+behind it has no port of its own. The script passes the browser's `Host`
+through, which the front checks. Uncomment `trusted_proxies: [127.0.0.1]`
+in the overlay so the sign-in limit counts each client rather than nginx,
+and, if nginx is to be the only way in, set `listen: 127.0.0.1:8000` there
+too.
