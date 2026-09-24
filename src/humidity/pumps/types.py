@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import NamedTuple, Self
+from typing import Literal, NamedTuple, Self
 
 from flyball.foundation.primitives import Labelled
 from flyball.foundation.typing import NonNegative, Normalised, Percent, Positive
@@ -11,10 +11,15 @@ from humidity.units import Flow, Humidity
 
 
 class OnOverdrive(Labelled):
-    """How to handle a requested flow change that exceeds the maximum."""
+    """How to handle a requested flow change that exceeds the maximum.
+
+    `raise` applies only to a command run by hand (`set_blend`, `set_humidity`,
+    `set_fraction`); a blend a controller's humidity demand makes, or a moved
+    supply re-blends, always scales, so a controller's write is never refused.
+    """
 
     RAISE = "raise", "Refuse the request"  # raise FlowsOverdrivenError
-    CLAMP = "clamp", "Clamp to the maximum"  # clamp to the maximum flow
+    CLAMP = "clamp", "Scale both lines down, keeping the mix"  # `SupplyFlows.derated`
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,7 +38,27 @@ class OfGuaranteedMax:
     guaranteed_max_fraction: Normalised = 1.0
 
 
-type BlendFlow = Absolute | OfBlendMax | OfGuaranteedMax
+type FixedBlendFlow = Absolute | OfBlendMax | OfGuaranteedMax
+"""A blend flow that says how much air to move, with no reference to what moves now."""
+
+
+@dataclass(frozen=True, slots=True)
+class KeepTotal:
+    """Keep the total flow the pumps were moving when the blender entered `humidity` mode.
+
+    Opt-in; resolved once on each entry into `humidity` mode to
+    `Absolute(<total then>, CLAMP)` and held for that episode, never
+    re-evaluated per blend. At or below a small floor (pumps stopped),
+    `fallback` is used instead; None means the configured blend flow,
+    `Absolute(<configured>, CLAMP)`.
+    """
+
+    fallback: FixedBlendFlow | None = None
+    keep: Literal[True] = True
+    """Always true: what tells a `KeepTotal` apart on the wire."""
+
+
+type BlendFlow = Absolute | OfBlendMax | OfGuaranteedMax | KeepTotal
 
 DefaultBlendFlow = OfGuaranteedMax()
 

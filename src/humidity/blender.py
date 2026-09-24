@@ -9,7 +9,7 @@ delivery. `mode` says which demand is in control.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from flyball.foundation.device import (
     Access,
@@ -38,6 +38,8 @@ from humidity.pumps import (
     DefaultBlendFlow,
     DefaultHumidities,
     DualPumps,
+    FixedBlendFlow,
+    KeepTotal,
     MaxFlows,
     OnOverdrive,
     PumpPair,
@@ -106,6 +108,13 @@ class Mode(Labelled):
 SUPPLY_UNKNOWN = "supply_unknown"
 """The blender's condition while a bound supply sensor has no value: nothing is blended."""
 
+BLEND_FLOW_KEPT = "blend_flow_kept"
+"""The blender's event when a `KeepTotal` blend flow resolves on entering `humidity` mode."""
+
+KEEP_FLOOR = 0.01
+"""A total flow at or below this share of the guaranteed maximum is taken as stopped: a
+`KeepTotal` then uses its `fallback`, since a held total of 0 would blend no air."""
+
 DRY = {"line": "dry"}
 WET = {"line": "wet"}
 """Each line's signals share a `line` tag across the tree: `flows.dry`, `efforts.dry`, ..."""
@@ -123,7 +132,16 @@ class DualPumpBlender(Committable):
     `supply_unknown`, and `set_humidity` refuses (a `NotReadyError`). `set_flows`, `set_efforts` and
     `stop` drive the lines at once and put it in `flows` mode, so a supply
     reading re-blends only in `humidity` mode. The flows and efforts are demands whose
-    readbacks follow whatever is driving the pumps.
+    readbacks follow whatever is driving the pumps. In `flows` mode `humidity`'s
+    readback is what the flows deliver from the supplies now (the model run
+    backwards), so a controller in manual tracks what is delivered; with no flow it
+    and `blend.wet_fraction` have no value (`not_applicable("no_flow")`).
+
+    The blend is allocated inside the effective `flows.*` limits (a rig file's
+    narrowing included), not only the pumps' `max_flow`. An `Absolute` blend flow's
+    `raise` refuses only a command run by hand; a blend a humidity demand or a moved
+    supply makes always scales. `set_blend` moves the pumps, so it is refused while a
+    controller regulates `humidity` (put it in manual first).
     """
 
     flows = Namespace("flows", "Flows")
@@ -177,18 +195,27 @@ class DualPumpBlender(Committable):
         pumps: DualPumps,
         *,
         supply: SupplyHumidities = DefaultHumidities,
-        blend_flow: Positive = 1.0,
+        blend_flow: Positive | KeepTotal = 1.0,
         label: str | None = None,
     ) -> None:
         super().__init__(name, label)
         self._pumps = pumps
         self._target = (supply.dry + supply.wet) / 2.0
+        self._kept: FixedBlendFlow | None = None
+        """What a `KeepTotal` resolved to on entering `humidity` mode, held for the episode."""
+        if isinstance(blend_flow, KeepTotal):
+            fallback = blend_flow.fallback
+            self._configured = _scaling(fallback if isinstance(fallback, Absolute) else None)
+            setting: BlendFlow = blend_flow
+        else:
+            self._configured = setting = Absolute(blend_flow, OnOverdrive.CLAMP)
         self.dry_max_flow.push(pumps.dry_max_flow)
         self.wet_max_flow.push(pumps.wet_max_flow)
         self.dry_supply_default.push(supply.dry)
         self.wet_supply_default.push(supply.wet)
-        self.blend_flow.push(Absolute(blend_flow, OnOverdrive.CLAMP))
-        self._push_readbacks()  # the pumps as found: every demand has a value from the start
+        self.blend_flow.push(setting)
+        # The pumps as found: every demand has a value from the start.
+        self._push_readbacks(flows_in_force=True)
 
     @property
     def _supply(self) -> SupplyHumidities:
@@ -204,6 +231,7 @@ class DualPumpBlender(Committable):
         if (target := self.humidity.staged) is not None:
             self._target = target
             if self.mode.value is not Mode.HUMIDITY:
+                self._kept = None  # a new episode: a KeepTotal resolves again
                 self.mode.push(Mode.HUMIDITY, time_ns)
         if self.mode.value is Mode.HUMIDITY:
             try:
@@ -213,9 +241,37 @@ class DualPumpBlender(Committable):
                     SUPPLY_UNKNOWN, Severity.WARNING, f"{error}: nothing blended until it reads"
                 )
                 self.push(time_ns, expected_humidity=invalid("supply"))
+        else:
+            # A moved supply moves what the same flows deliver.
+            expected = self._expected(self._pumps.flows)
+            self.push(time_ns, expected_humidity=expected, humidity=expected)
 
-    def _blend_pumps(self, time_ns: int | None = None, blend: BlendFlow | None = None) -> None:
+    @property
+    def _caps(self) -> MaxFlows:
+        """The most each line may be asked for now: the effective `flows.*` limits' tops.
+
+        A rig file's `limits` narrow them below the pumps' `max_flow`; the
+        allocator works inside these, the efforts against the pumps' own maxima.
+        """
+        dry, wet = self.dry_flow.limits, self.wet_flow.limits
+        return MaxFlows(
+            max(dry[1], 1e-12) if dry is not None else self._pumps.dry_max_flow,
+            max(wet[1], 1e-12) if wet is not None else self._pumps.wet_max_flow,
+        )
+
+    def _blend_pumps(
+        self,
+        time_ns: int | None = None,
+        blend: BlendFlow | None = None,
+        *,
+        manual: bool = False,
+        rekeep: bool = False,
+    ) -> float | None:
         """Put the blend on the pumps: the wet fraction for the target, the flow `blend` says.
+
+        `manual` for a command run by hand (an `Absolute`'s `raise` holds);
+        `rekeep` to resolve a `KeepTotal` again although this episode holds one.
+        Returns the total a `KeepTotal` resolved to on this call, if one did.
 
         Raises:
             NoValueError: A bound supply sensor has no value: nothing is blended.
@@ -225,34 +281,103 @@ class DualPumpBlender(Committable):
         railed = isinstance(fraction, Limit)
         self.humidity.at_limit = fraction if railed else None
         wet = fraction.fraction if isinstance(fraction, Limit) else fraction
-        self._set_blend(time_ns, self.blend_flow.value if blend is None else blend, wet)
+        setting = self.blend_flow.value if blend is None else blend
+        return self._set_blend(time_ns, setting, wet, manual=manual, episode=True, rekeep=rekeep)
 
-    def _set_blend(self, time_ns: int | None, blend: BlendFlow, wet: float) -> None:
-        """One pump write for a blend, then every readback and the setting at one instant."""
-        self._pumps.set_blend(blend, wet)
-        self._push_readbacks(time_ns, blend=blend)
+    def _set_blend(
+        self,
+        time_ns: int | None,
+        setting: BlendFlow,
+        wet: float,
+        *,
+        manual: bool,
+        episode: bool = False,
+        rekeep: bool = False,
+    ) -> float | None:
+        """One pump write for a blend, then every readback and the setting at one instant.
+
+        `episode` in `humidity` mode, where a `KeepTotal` is held once resolved.
+        Returns the total a `KeepTotal` resolved to on this call, if one did.
+        """
+        flow, fell_back = self._effective(setting, manual=manual, episode=episode, rekeep=rekeep)
+        self._pumps.set_blend(flow, wet, self._caps)
+        self._push_readbacks(time_ns, blend=setting, flows_in_force=not episode)
+        if fell_back is None or not episode:
+            return None  # `set_fraction`'s keep holds the total now, with no episode to report
+        return self._report_kept(flow, fell_back=fell_back)
+
+    def _effective(
+        self, setting: BlendFlow, *, manual: bool, episode: bool, rekeep: bool
+    ) -> tuple[FixedBlendFlow, bool | None]:
+        """What the pumps are given for `setting` now.
+
+        With it, for a `KeepTotal` resolved on this call, whether it fell back
+        (the pumps were stopped); None when nothing resolved.
+        """
+        if isinstance(setting, KeepTotal):
+            if episode and self._kept is not None and not rekeep:
+                return self._kept, None
+            total = self._pumps.total_flow
+            fell_back = total <= KEEP_FLOOR * self._caps.guaranteed
+            kept = (
+                _scaling(self._configured if setting.fallback is None else setting.fallback)
+                if fell_back
+                else Absolute(total, OnOverdrive.CLAMP)
+            )
+            if episode:
+                self._kept = kept
+            return kept, fell_back
+        if not manual:
+            return _scaling(setting), None
+        return setting, None
+
+    def _report_kept(self, kept: FixedBlendFlow, *, fell_back: bool) -> float:
+        """The event for a resolved `KeepTotal`; returns the total the blend holds."""
+        delivered = self._pumps.total_flow
+        held = kept.flow if isinstance(kept, Absolute) else delivered
+        clamped = delivered < held * (1.0 - 1e-9)
+        message = (
+            f"the pumps were stopped: humidity mode holds the fallback, {held:.3g} L/min"
+            if fell_back
+            else f"humidity mode keeps the total flow, {held:.3g} L/min"
+        )
+        if clamped:
+            message += f"; this mix delivers {delivered:.3g} L/min, the most it can"
+        self.event(
+            BLEND_FLOW_KEPT,
+            Severity.WARNING if clamped else Severity.INFO,
+            message,
+            {"total": held, "fallback": fell_back, "delivered": delivered, "clamped": clamped},
+        )
+        return held
 
     def _push_readbacks(
         self,
         time_ns: int | None = None,
         blend: BlendFlow | None = None,
-        wet_fraction: float | None = None,
+        *,
+        flows_in_force: bool = False,
     ) -> None:
         """What the pumps are now doing, on the flow and effort demands, and what it delivers.
 
-        `blend` only when given, `wet_fraction` the pumps' own unless given.
-        `expected_humidity` has no value with no flow (`not_applicable("no_flow")`:
-        a chart breaks, nothing reads 0) or while a supply has none (`invalid("supply")`).
+        `blend` only when given. `expected_humidity` and `blend.wet_fraction` have
+        no value with no flow (`not_applicable("no_flow")`: a chart breaks, nothing
+        reads 0); `expected_humidity` none while a supply has none
+        (`invalid("supply")`). With `flows_in_force`, `humidity`'s readback is
+        `expected_humidity` too: what the flows deliver, not a target.
         """
         output = self._pumps.output
+        flows = output.flows
+        expected = self._expected(flows)
         self.push(
             time_ns,
-            wet_fraction=output.flows.wet_fraction if wet_fraction is None else wet_fraction,
-            dry_flow=output.flows.dry,
-            wet_flow=output.flows.wet,
+            wet_fraction=flows.wet_fraction if flows.total > 0 else not_applicable("no_flow"),
+            dry_flow=flows.dry,
+            wet_flow=flows.wet,
             dry_effort=output.efforts.dry,
             wet_effort=output.efforts.wet,
-            expected_humidity=self._expected(output.flows),
+            expected_humidity=expected,
+            humidity=expected if flows_in_force else None,
             blend_flow=blend,
         )
 
@@ -265,59 +390,73 @@ class DualPumpBlender(Committable):
         expected = expected_humidity_from_flows(flows, supply)
         return not_applicable("no_flow") if expected is None else expected
 
-    @command
+    @command(writes=(dry_flow, wet_flow))
     def set_blend(self, blend_flow: BlendFlow) -> None:
         """Choose how much air the blend moves.
 
         An absolute flow (and what to do if the lines cannot give it), a
-        fraction of the most the blend can move at this mix, or a fraction of
-        the flow guaranteed at every mix. Takes effect at once in `humidity`
-        mode, else at the next blend.
+        fraction of the most the blend can move at this mix, a fraction of
+        the flow guaranteed at every mix, or the total the pumps move when
+        the blender enters `humidity` mode (`keep`, with a fallback for when
+        they are stopped). Takes effect at once in `humidity` mode, else at
+        the next blend. Refused while a controller regulates the humidity:
+        put it in manual first.
         """
         if self.mode.value is Mode.HUMIDITY:
-            self._blend_pumps(blend=blend_flow)  # may refuse (overdrive): then the setting stands
+            # May refuse (overdrive): then the setting stands.
+            self._blend_pumps(blend=blend_flow, manual=True, rekeep=True)
         else:
             self.blend_flow.push(blend_flow)
 
     @command(mode=Mode.HUMIDITY, interrupts=True)
-    def set_humidity(self, humidity: Humidity, blend_flow: BlendFlow | None = None) -> None:
+    def set_humidity(self, humidity: Humidity, blend_flow: BlendFlow | None = None) -> Flow | None:
         """Blend to a humidity at a blend flow, by hand: the controller, if any, goes to manual.
 
         Either argument left out is filled from its current reading (the
         target's, or `blend.flow`'s) and re-applied. What a controller does
         through the `humidity` demand, done in one go from a program or a form.
+        Returns the total flow a `keep` blend flow resolved to on entering
+        `humidity` mode (L/min), or null.
         """
+        if self.mode.value is not Mode.HUMIDITY:
+            self._kept = None  # a new episode: a KeepTotal resolves again
         self._target = humidity
-        self._blend_pumps(blend=blend_flow)
+        return self._blend_pumps(blend=blend_flow, manual=True)
 
     @command(mode=Mode.FLOWS, interrupts=True)
     def set_fraction(self, blend_flow: BlendFlow, wet_fraction: float) -> None:
         """Blend at a wet fraction by hand, at a blend flow.
 
         Either argument left out is filled from its current reading
-        (`blend.flow`'s, or `blend.wet_fraction`'s) and re-applied.
+        (`blend.flow`'s, or `blend.wet_fraction`'s) and re-applied; with no
+        flow the wet fraction has no value, so give it. A `keep` blend flow
+        keeps the total the pumps move now.
         """
-        self._set_blend(None, blend_flow, wet=wet_fraction)
+        self._kept = None
+        self._set_blend(None, blend_flow, wet=wet_fraction, manual=True)
 
     @command(mode=Mode.FLOWS, interrupts=True)
     def set_flows(self, dry: Annotated[Flow, dry_flow], wet: Annotated[Flow, wet_flow]) -> None:
         """Drive each line at a flow. A line left out keeps its current flow."""
+        self._kept = None
         self._pumps.set_flows(SupplyFlows(dry, wet))
-        self._push_readbacks()
+        self._push_readbacks(flows_in_force=True)
 
     @command(mode=Mode.FLOWS, interrupts=True)
     def set_efforts(
         self, dry: Annotated[Normalised, dry_effort], wet: Annotated[Normalised, wet_effort]
     ) -> None:
         """Drive each line at an effort, 0-1 of full. A line left out keeps its current effort."""
+        self._kept = None
         self._pumps.set_efforts(SupplyEfforts(dry, wet))
-        self._push_readbacks()
+        self._push_readbacks(flows_in_force=True)
 
     @command(mode=Mode.FLOWS, interrupts=True)
     def stop(self) -> None:
         """Stop both pumps at once; a controller driving the target goes to manual."""
+        self._kept = None
         self._pumps.stop()
-        self._push_readbacks()
+        self._push_readbacks(flows_in_force=True)
 
 
 class PumpLineConfig(BaseModel):
@@ -339,6 +478,28 @@ class SupplyConfig(BaseModel):
     wet: Humidity
 
 
+class KeepBlendFlow(BaseModel):
+    """`blend_flow: {keep: true, fallback: 1.0}`: keep the total flow on entering `humidity`.
+
+    The total the pumps move then is held for the episode; `fallback` (L/min,
+    scaling) when they are stopped. No bare `keep`: the fallback is always visible.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    keep: Literal[True]
+    fallback: Positive
+
+
+def _scaling(flow: FixedBlendFlow | None) -> FixedBlendFlow:
+    """`flow` with an `Absolute`'s `raise` made `clamp` (scale); None: 1 L/min, scaling."""
+    if flow is None:
+        return Absolute(1.0, OnOverdrive.CLAMP)
+    if isinstance(flow, Absolute) and flow.on_overdrive is not OnOverdrive.CLAMP:
+        return Absolute(flow.flow, OnOverdrive.CLAMP)
+    return flow
+
+
 class DualPumpBlenderConfig(DriverConfig[DualPumpBlender], type="dual_pump_blender"):
     """Two channels of one PWM chip, blended by `commit`.
 
@@ -351,7 +512,8 @@ class DualPumpBlenderConfig(DriverConfig[DualPumpBlender], type="dual_pump_blend
     frequency_hz: Positive = 20_000.0
     dry: PumpLineConfig
     wet: PumpLineConfig
-    blend_flow: Positive = 1.0
+    blend_flow: Positive | KeepBlendFlow = 1.0
+    """L/min, scaling to what the mix can move; or `{keep: true, fallback: <L/min>}`."""
     supply: SupplyConfig | None = None
     """A starting supply humidity, for a rig with no sensor bound to `dry`/`wet`."""
 
@@ -366,4 +528,9 @@ class DualPumpBlenderConfig(DriverConfig[DualPumpBlender], type="dual_pump_blend
             if self.supply is not None
             else DefaultHumidities
         )
-        return DualPumpBlender(name, pumps, supply=supply, blend_flow=self.blend_flow, label=label)
+        blend_flow = (
+            KeepTotal(Absolute(self.blend_flow.fallback, OnOverdrive.CLAMP))
+            if isinstance(self.blend_flow, KeepBlendFlow)
+            else self.blend_flow
+        )
+        return DualPumpBlender(name, pumps, supply=supply, blend_flow=blend_flow, label=label)

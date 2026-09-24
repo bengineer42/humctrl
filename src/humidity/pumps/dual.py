@@ -7,10 +7,11 @@ from .drivers import DualPumpDriver
 from .errors import FlowsOverdrivenError
 from .types import (
     Absolute,
-    BlendFlow,
     CurrentBlend,
+    FixedBlendFlow,
     MaxFlows,
     OfBlendMax,
+    OfGuaranteedMax,
     OnOverdrive,
     PumpsLimits,
     PumpsState,
@@ -142,20 +143,33 @@ class DualPumps:
 
     def set_blend(
         self,
-        flow: BlendFlow,
+        flow: FixedBlendFlow,
         wet_fraction: Normalised,
+        caps: MaxFlows | None = None,
     ) -> PumpsState:
+        """Blend `wet_fraction` at `flow`, allocated inside `caps` (default: the pumps' maxima).
+
+        `caps` are the flows each line may be asked for now -- the blender's
+        effective `flows.*` limits, which a rig file may narrow below the
+        pumps' `max_flow`. The efforts are still worked out against the
+        pumps' own maxima.
+        """
+        caps = self.max_flows if caps is None else caps
         if isinstance(flow, Absolute):
             flows = SupplyFlows.from_blend(flow.flow, wet_fraction)
-            if flow.on_overdrive == OnOverdrive.RAISE and not flows.is_valid(self.max_flows):
-                self.raise_flow_overdriven(flows, wet_fraction)
-            flows = flows.derated(self.max_flows)
+            if flow.on_overdrive == OnOverdrive.RAISE and not flows.is_valid(caps):
+                raise FlowsOverdrivenError(
+                    flows=flows, max_flows=caps, units=self.units, wet_fraction=wet_fraction
+                )
+            flows = flows.derated(caps)
         elif isinstance(flow, OfBlendMax):
-            flows = self.max_flows.flows_at_blend(wet_fraction) * flow.blend_fraction
-        else:
+            flows = caps.flows_at_blend(wet_fraction) * flow.blend_fraction
+        elif isinstance(flow, OfGuaranteedMax):
             flows = SupplyFlows.from_blend(
-                flow.guaranteed_max_fraction * self.guaranteed_max_flow, wet_fraction
+                flow.guaranteed_max_fraction * caps.guaranteed, wet_fraction
             )
+        else:
+            raise TypeError(f"{flow!r} is resolved by the blender before it reaches the pumps")
         efforts = flows.to_efforts(self.max_flows)
 
         return self.set_efforts(efforts)

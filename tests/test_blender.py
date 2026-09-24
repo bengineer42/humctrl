@@ -28,13 +28,26 @@ from pydantic import TypeAdapter
 from humidity.blender import (
     DualPumpBlender,
     DualPumpBlenderConfig,
+    KeepBlendFlow,
     Mode,
     PumpLineConfig,
     SupplyConfig,
     SupplyHumiditiesError,
     calculate_wet_fraction,
 )
-from humidity.pumps import DualPumps, MaxFlows, PumpPair, PwmPump, SupplyHumidities
+from humidity.pumps import (
+    Absolute,
+    BlendFlow,
+    DualPumps,
+    FlowsOverdrivenError,
+    KeepTotal,
+    MaxFlows,
+    OfBlendMax,
+    OnOverdrive,
+    PumpPair,
+    PwmPump,
+    SupplyHumidities,
+)
 from humidity.units import HUMIDITY, WET_FRACTION, Flow
 
 
@@ -421,3 +434,154 @@ def test_the_config_builds_a_working_blender_on_a_fake_pwm_chip(fresh: Any) -> N
     device.set_flows(0.4, 0.6)
     assert chip.channels.keys() == {0, 1}
     assert chip.enabled == {0: True, 1: True}
+
+
+class TestHonesty:
+    """D17(5): the readbacks say what the pumps deliver; the allocator stays inside the limits."""
+
+    def test_in_flows_mode_humidity_reads_what_the_flows_deliver(
+        self, rig: Any, sensors: Sensors, blender: DualPumpBlender
+    ) -> None:
+        rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
+        assert blender.humidity.value == pytest.approx(0.4 * 0.1 * 100 + 0.6 * 90.0), (
+            "58 %RH: the model run backwards, not the last target"
+        )
+        dry_h = sensors.signals["dry.humidity"]
+        rig.bind_inputs(blender, {"dry": dry_h.address})
+        rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 20.0})])
+        assert blender.humidity.value == pytest.approx(0.4 * 20.0 + 0.6 * 90.0), (
+            "a moved supply moves what the same flows deliver"
+        )
+        assert blender.expected_humidity.value == pytest.approx(blender.humidity.value)
+
+    def test_with_no_flow_humidity_and_wet_fraction_have_no_value(
+        self, rig: Any, blender: DualPumpBlender
+    ) -> None:
+        rig.run_command(blender, "stop")
+        assert rig.router.latest[blender.wet_fraction].value == not_applicable("no_flow")
+        assert rig.router.latest[blender.humidity].value == not_applicable("no_flow")
+        with pytest.raises(NotReadyError):
+            rig.run_command(blender, "set_fraction", {}), "no wet fraction to fill it from"
+        rig.run_command(blender, "set_fraction", {"wet_fraction": 0.25})
+        assert blender.wet_fraction.value == pytest.approx(0.25)
+
+    def test_the_allocator_stays_inside_a_narrowed_flow_limit(
+        self,
+        rig: Any,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, wet = pumps
+        blender.dry_flow.narrow((0.0, 1.0))
+        rig.run_command(blender, "set_blend", {"blend_flow": OfBlendMax(1.0)})
+        rig.run_command(blender, "set_humidity", {"humidity": 10.0})  # all dry
+        assert blender.dry_flow.value == pytest.approx(1.0), "the narrowed 1 L/min, not max_flow 2"
+        assert dry.calls[-1] == pytest.approx(0.5), "the effort is still against max_flow"
+        assert wet.calls[-1] == pytest.approx(0.0)
+
+    def test_raise_refuses_a_command_but_a_humidity_demand_scales(
+        self, rig: Any, blender: DualPumpBlender
+    ) -> None:
+        overdrive = Absolute(5.0, OnOverdrive.RAISE)
+        with pytest.raises(FlowsOverdrivenError):
+            rig.run_command(blender, "set_humidity", {"humidity": 50.0, "blend_flow": overdrive})
+        rig.run_command(blender, "set_flows", {"dry": 0.1, "wet": 0.1})
+        rig.run_command(blender, "set_blend", {"blend_flow": overdrive}), "flows mode: stored"
+        rig.write(blender.root, {"humidity": 50.0})  # a controller's path: commit never raises
+        assert blender.mode.value is Mode.HUMIDITY
+        assert blender.dry_flow.value == pytest.approx(2.0), "scaled to the lines' maxima"
+        assert blender.wet_flow.value == pytest.approx(2.0)
+
+    def test_set_blend_is_refused_while_a_controller_regulates(
+        self, rig: Any, sensors: Sensors, blender: DualPumpBlender
+    ) -> None:
+        controller = rig.attach_controller(
+            blender.humidity, sensors.signals["chamber.humidity"], law=P(kp=1.0)
+        )
+        controller.regulate(50.0, transfer=Transfer.COLD)
+        assert DualPumpBlender.commands["set_blend"].writes == ("flows.dry", "flows.wet")
+        for flow in (Absolute(0.0), OfBlendMax(0.0), Absolute(1.5)):
+            with pytest.raises(ConflictError, match="driven by controller"):
+                rig.run_command(blender, "set_blend", {"blend_flow": flow})
+        assert controller.mode.active()
+
+    @pytest.mark.parametrize(
+        ("address", "command"),
+        [
+            ("flows.dry", "set_flows"),
+            ("efforts.wet", "set_efforts"),
+            ("blend.wet_fraction", "set_fraction"),
+        ],
+    )
+    def test_a_write_to_a_readback_names_the_command_that_moves_it(
+        self, rig: Any, blender: DualPumpBlender, address: str, command: str
+    ) -> None:
+        with pytest.raises(ConflictError, match=f"moved by the command '{command}' \\(it puts"):
+            rig.write(blender.root, {address: 0.5})
+
+
+class TestKeepTotal:
+    """D21: `KeepTotal`, opt-in, resolved once on entering `humidity` mode."""
+
+    def test_entering_humidity_mode_keeps_the_total_the_pumps_move(
+        self, rig: Any, blender: DualPumpBlender
+    ) -> None:
+        rig.run_command(blender, "set_flows", {"dry": 0.3, "wet": 0.9})
+        rig.run_command(blender, "set_blend", {"blend_flow": KeepTotal()})
+        rig.write(blender.root, {"humidity": 50.0})
+        assert blender.dry_flow.value + blender.wet_flow.value == pytest.approx(1.2)
+        assert blender.wet_fraction.value == pytest.approx(0.5)
+        event = rig.recent[-1]
+        assert event.code == "blend_flow_kept" and event.details["total"] == pytest.approx(1.2)
+        assert blender.blend_flow.value == KeepTotal(), "the setting shows keep, not the number"
+        rig.write(blender.root, {"humidity": 70.0})
+        total = blender.dry_flow.value + blender.wet_flow.value
+        assert total == pytest.approx(1.2), "held for the episode, not re-resolved"
+
+    def test_stopped_pumps_fall_back(self, rig: Any, blender: DualPumpBlender) -> None:
+        rig.run_command(blender, "stop")
+        rig.run_command(blender, "set_blend", {"blend_flow": KeepTotal(Absolute(0.4))})
+        kept = rig.run_command(blender, "set_humidity", {"humidity": 50.0})
+        assert kept == pytest.approx(0.4), "set_humidity returns the resolved total"
+        assert blender.dry_flow.value + blender.wet_flow.value == pytest.approx(0.4)
+        assert rig.recent[-1].details["fallback"] is True
+
+    def test_a_fallback_of_none_is_the_configured_blend_flow(
+        self, rig: Any, blender: DualPumpBlender
+    ) -> None:
+        rig.run_command(blender, "stop")
+        kept = rig.run_command(
+            blender, "set_humidity", {"humidity": 50.0, "blend_flow": KeepTotal()}
+        )
+        assert kept == pytest.approx(1.0), "the fixture's blend_flow=1.0"
+
+    def test_a_clamped_total_says_so(self, rig: Any, blender: DualPumpBlender) -> None:
+        rig.run_command(blender, "set_flows", {"dry": 2.0, "wet": 2.0})
+        rig.run_command(blender, "set_blend", {"blend_flow": KeepTotal()})
+        rig.run_command(blender, "set_humidity", {"humidity": 90.0})  # all wet: 2 L/min at most
+        event = rig.recent[-1] if rig.recent[-1].code == "blend_flow_kept" else rig.recent[-2]
+        assert event.details["clamped"] is True and event.details["delivered"] == pytest.approx(2.0)
+
+    def test_the_wire_and_the_rig_file_forms(self) -> None:
+        adapter = TypeAdapter(BlendFlow)
+        assert adapter.validate_python({"keep": True}) == KeepTotal()
+        assert adapter.validate_python({
+            "keep": True,
+            "fallback": {"flow": 1.0, "on_overdrive": "clamp"},
+        }) == KeepTotal(Absolute(1.0, OnOverdrive.CLAMP))
+        assert adapter.validate_python({"flow": 1.0}) == Absolute(1.0)
+        assert adapter.validate_python({"blend_fraction": 0.5}) == OfBlendMax(0.5)
+        config = DualPumpBlenderConfig(
+            link="pwm0",
+            dry=PumpLineConfig(channel=0, max_flow=2.0),
+            wet=PumpLineConfig(channel=1, max_flow=2.0),
+            blend_flow={"keep": True, "fallback": 1.5},
+        )
+        assert config.blend_flow == KeepBlendFlow(keep=True, fallback=1.5)
+        with pytest.raises(ValueError, match="fallback"):
+            DualPumpBlenderConfig(
+                link="pwm0",
+                dry=PumpLineConfig(channel=0, max_flow=2.0),
+                wet=PumpLineConfig(channel=1, max_flow=2.0),
+                blend_flow={"keep": True},
+            )
