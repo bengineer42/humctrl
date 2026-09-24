@@ -8,23 +8,36 @@ together.
 
 ## A sensor read fails: the device goes offline
 
-`hum_sensors` is polled on a period (`poll_s`); if any exception escapes
-`Sht4xSet.read` — a bad CRC or a short reply
-(`HardwareError`, raised directly by `decode` in
-`flyball_chips.sht4x`), or an I2C bus error under it — the
-runtime's polling loop (`flyball.rig.polling.Polling._read`) doesn't
-retry: it raises an `offline` condition (severity `error`, the exception's
-message) on the device in the rig's condition store, stops polling it, and
-the event log gets an `offline` event with `edge: raised`. The
-device stays offline — no more reads, no more samples, nothing publishing
-— until explicitly restarted (`POST /api/devices/hum_sensors/restart`),
-which clears the condition (an `offline` event with `edge: cleared` and
-how long it lasted) and resumes polling on the same period.
+`hum_sensors` is polled on a period (`poll_s`); an exception escaping
+`Sht4xSet.read` -- a bad CRC or a short reply (`HardwareError`, raised
+directly by `decode` in `flyball_chips.sht4x`), or an I2C bus error under
+it -- counts toward the device's failure budget (`reads.fail_after`, 3 by
+default). Below it polling carries on at its period; at it the device holds
+`offline` (severity `error`, the exception's message), every humidity and
+temperature it has delivered reads `stale` (reason `device_offline`) at
+once, and the runtime retries with backoff until a read succeeds, which
+clears `offline`. `POST /api/devices/hum_sensors/restart` reads it again
+without waiting out the backoff.
 
-Because `hum_sensors` is three atomic namespaces read independently, a
-CRC failure on `wet` alone still takes the *whole device* offline, not
-just that namespace — `read` raising at all is what the polling loop
-sees, whichever namespace was mid-transaction.
+Because `hum_sensors` is three atomic namespaces read in one `read`, a CRC
+failure on `wet` alone counts against the *whole device* -- `read` raising
+at all is what the polling loop sees, whichever namespace was
+mid-transaction.
+
+## A sensor that stops reporting, or a read that hangs
+
+A signal that stops arriving without an error -- a namespace the driver
+leaves out, a device that returns nothing -- goes `stale` at its
+threshold, `max(3 × poll_s, 5 s)`: 5 s for the chamber (`poll_s: 1`),
+15 s for the supplies (`poll_s: 5`). The rig pushes it on its own clock
+(reason `last_read` when the device still delivers its other signals,
+`silent` when it delivers nothing, `never_read` if it was never read), so
+the chart breaks there, `blender.humidity` freezes on a stale chamber
+reading, and a stale supply is `supply_unknown`
+([the blender](../3-devices/blender.md#a-supply-sensor-with-no-value)). A
+poll whose read is still in flight after 5 s is stuck in its driver: the
+device holds `hung`, and what it read is `stale` (reason `device_hung`)
+until the read returns.
 
 ## A read that succeeds but is slow
 
@@ -81,6 +94,17 @@ pumps — but the result isn't what was asked for:
   the bound sensors' readings cross (the wet line reading drier than the
   dry line, say, or a swapped I2C address).
 
+## A pump write fails
+
+A blender `commit` that raises (a PWM write the kernel refuses) holds
+`write_failed` on the blender until a commit succeeds, and its echo
+demands -- `humidity` and the rest -- read `stale` (reason `write_failed`)
+meanwhile. The demand it carried is kept, not dropped: it goes out with the
+next commit, and the rig retries on its own clock, first after 5 s (the
+blender has no `poll_s`) and then doubling up to 60 s, each re-send a
+`resent` event, until it is older than `retry_max_age_s` (60 s), when it is
+dropped with a `write_dropped` event.
+
 ## The pumps themselves fail
 
 `humidity.pumps.errors.PumpHardwareError` wraps whatever the underlying
@@ -92,8 +116,8 @@ errors, not just the first — if either does.
 
 ## Recovering
 
-A device stays offline until `POST /api/devices/{name}/restart`, or the
-runner is restarted outright. Building the blender always disables both
+An offline device is read again on its backoff, and `POST
+/api/devices/{name}/restart` reads it at once. Building the blender always disables both
 PWM channels first — `PwmPump.__init__` calls `link.enable(channel,
 False)` before anything else — so a fresh `flyball-runner` start never
 inherits a pump left running by a process that died mid-write; it's a

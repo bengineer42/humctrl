@@ -76,6 +76,14 @@ A few things worth noticing:
   has no such exception: it folds the same way whether or not other
   arguments are given (`minutes: 3` alongside `to`, or a `Speed`
   `per_minute: 10`) — either reads directly onto the one pace field.
+- **A ramp moves the pumps between readings.** The chamber sensor is read
+  every second, but while `blender.humidity` follows a ramp the rig
+  re-applies the ramp's setpoint (its feedforward, the identity here,
+  plus the PI's last correction) every `max(0.1 s, poll_s / 4)` -- 0.25 s
+  on this rig -- so the humidity demand, and the pumps behind it, move in
+  quarter-second steps rather than one-second ones. The PI itself steps
+  only on readings. Set `setpoint_period_s` on the controller to change
+  the rate.
 - **`timeout` never folds, in any step.** It is always written nested,
   `timeout: {minutes: 8}`, whatever the step's own primary field is: it is
   set aside before folding is even considered. `wait`'s `duration` is the

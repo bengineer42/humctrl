@@ -93,9 +93,10 @@ drawing the last blend), and while a supply has none it is `invalid`
 
 ### A supply sensor with no value
 
-A bound supply sensor whose reading has no value (`invalid`, or `stale`
-once its device is offline) is never replaced by the config's `supply`
-humidity: in `humidity` mode nothing is blended, and the pumps keep what
+A bound supply sensor whose reading has no value (`invalid`, or `stale`:
+its device offline or hung, or nothing read within its threshold --
+`max(3 × poll_s, 5 s)`, 15 s for the supply sensors' `poll_s: 5`) is never
+replaced by the config's `supply` humidity: in `humidity` mode nothing is blended, and the pumps keep what
 they are doing. The blender holds the `supply_unknown` condition (a
 warning) until the sensor reads again, when it blends at once and the
 condition clears. It is not a failed write, so the blender's demands stay
