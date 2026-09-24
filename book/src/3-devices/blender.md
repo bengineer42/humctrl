@@ -155,6 +155,15 @@ invalid -- and `set_humidity` refuses with 503.
   that is refused (an overdrive) leaves it regulating -- and the response's
   `interrupted` names it. `stop` stops both pumps at once, whatever is
   driving them.
+- `stop` is the blender's stop (`@command(stops=True)`): flyball's
+  software stop, the runner's shutdown and a controller's `on_fault: stop`
+  or `stop_device` run it rather than writing values. A rig file's `stop:`
+  values are refused on the blender -- `commit` ignores the flows and
+  efforts, so a value would never reach the pumps. If `stop` itself
+  raises, the blender is reported `failed` with no fallback ("fallback:
+  none effective"): the flows and efforts declare `off` at 0 but are
+  readbacks a stop cannot write, and `humidity` declares none. The
+  pumps' own error handling is in [When things fail](../1-running/failures.md).
 - `set_blend` is refused while a controller regulates `humidity`: it moves
   the pumps under the controller (a zero blend flow would wind it up against
   no air). Put the controller in manual first.

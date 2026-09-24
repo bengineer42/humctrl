@@ -93,7 +93,10 @@ flyball invoke blender stop
 
 calls the blender's `stop` command directly (`POST
 /api/devices/blender/commands/stop`) — both pumps off at once, bypassing whatever
-demand is pending. This does **not** touch the controller's mode: it's
-still regulating, and will move the pumps again on its next tick. To stop
-regulating as well, put the controller in manual with a program step
-(`- manual: {}`) or `POST /api/controllers/blender.humidity/manual`.
+demand is pending. Once it has succeeded it puts a controller regulating
+`blender.humidity` in manual, and the response's `interrupted` names it.
+
+`flyball stop` is flyball's software stop for the whole rig: it runs the
+same `stop` command on the blender, puts every controller in manual, and
+latches the rig until a person resets it
+([the software stop](https://bengineer42.github.io/flyball/latest/1-running/runner/access/#stopping-the-rig)).
