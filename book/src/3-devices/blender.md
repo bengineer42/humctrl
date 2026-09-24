@@ -20,7 +20,12 @@ per input. People run its commands, which drive the lines at once.
 | `mode` | readout | which demand is in control: `humidity` (a humidity demand, or `set_humidity`) or `flows` (`set_flows`, `set_efforts`, `set_fraction`, `stop`) |
 | `blend.flow` | setting | the flow a `humidity` demand mixes to; `set_blend` (refused while a controller regulates `humidity`) |
 | `blend.wet_fraction` | demand, read-only | the share drawn from the wet line: the readback while blending, set only by `set_fraction` -- not directly writable; no value with no flow |
-| `max_flows.dry`, `max_flows.wet` | config | each line's maximum, the limit of its flow demand |
+
+Each line's maximum flow is not a signal: it is the top of that flow
+demand's `limits`, set from the pump's `max_flow` when the blender is
+built, so the device page and the command form show it with the flow.
+
+Its two inputs, `dry` and `wet`, are the supply lines' humidity (below).
 
 `flows.*`, `efforts.*` and `blend.wet_fraction` are declared `access=Access.RP`
 (readable and published, not writable): `commit` only ever reads `humidity`'s
@@ -89,34 +94,44 @@ device each: the split-range maths is its own, so one PWM chip link
 ## Following the supply lines
 
 ```yaml
-inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
+inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }   # rig-multi-sensor.yaml
+inputs: { dry: 36.5, wet: 88.5 }                                           # rig-single-sensor.yaml
 ```
 
-The blender declares two inputs, `dry` and `wet` (`supply.input(...)` in
-the class body); the rig file binds them to the sensors. Whenever a bound
-signal publishes, the rig commits the blender, and `commit` reads the
-supply's newest values from the router (`self.dry_supply.value`) — there
-is no callback and no copy on the device. In `humidity` mode that re-blends;
-in `flows` mode it does nothing. A rig with no sensor bound uses
-its `supply` field (the `supply_defaults` config signals) instead.
-`expected_humidity` is pushed after every pump write from the pumps'
-actual output and the current supply humidities. With no flow it has no
-value (`not_applicable`, reason `no_flow`: a chart breaks there rather than
-drawing the last blend), and while a supply has none it is `invalid`
-(reason `supply`).
+The blender declares two inputs, `dry` and `wet` (`humidities.input(...)` in
+the class body), and the rig file binds each one to a sensor's address or to
+a number. There is no default: a rig file that leaves one out does not load
+(`flyball rig check` says which), so `blender.yaml` is not a rig on its own.
+A number has its value from the start. Whenever a bound sensor publishes,
+the rig commits the blender, and `commit` reads the supply's newest values
+through the input's binding (`self.dry_supply.value`) — there is no callback
+and no copy on the device. In `humidity` mode that re-blends; in `flows`
+mode it does nothing. Nothing is blended before a humidity demand (or
+`set_humidity`): until one there is no target. `expected_humidity` is
+pushed after every pump write from the pumps' actual output and the current
+supply humidities. With no flow it has no value (`not_applicable`, reason
+`no_flow`: a chart breaks there rather than drawing the last blend), and
+while a supply has none it carries the supply's own quality and reason
+(`stale: device_offline`, `invalid: crc`), so the chart and the readout say
+why.
 
 ### A supply sensor with no value
 
-A bound supply sensor whose reading has no value (`invalid`, or `stale`:
-its device offline or hung, or nothing read within its threshold --
-`max(3 × poll_s, 5 s)`, 15 s for the supply sensors' `poll_s: 5`) is never
-replaced by the config's `supply` humidity: in `humidity` mode nothing is blended, and the pumps keep what
-they are doing. The blender holds the `supply_unknown` condition (a
+A supply sensor that has not been read yet (`pending`, up to one
+`poll_s` after start: 5 s on `rig-multi-sensor.yaml`), or whose reading has
+no value (`invalid`, or `stale`: its device offline or hung, or nothing read
+within its threshold -- `max(3 × poll_s, 5 s)`, 15 s for the supply
+sensors' `poll_s: 5`), is never replaced by a number: in `humidity` mode
+nothing is blended, and the pumps keep what they are doing. On
+`rig-multi-sensor.yaml` a supply sensor outage therefore holds humidity
+control; it used to fall back to constants. The blender holds the `supply_unknown` condition (a
 warning) until the sensor reads again, when it blends at once and the
 condition clears. It is not a failed write, so the blender's demands stay
-as they were. Meanwhile a `humidity` demand is refused (its limits follow
-the supplies, which are not known), a controller driving it holds
-`limit_unknown`, and `set_humidity` refuses with 503.
+as they were. Meanwhile a `humidity` demand is refused, naming the input
+(its limits follow the supplies, which are not known: "`its limit follows
+'dry' (pending)`"), a controller driving it holds `limit_unknown` -- an
+`info` while the sensor is only pending, a `warning` once it is stale or
+invalid -- and `set_humidity` refuses with 503.
 
 ## Limits
 
@@ -125,8 +140,8 @@ the supplies, which are not known), a controller driving it holds
   `[0, 100]` and still rail if it's outside what the current dry/wet
   supply can reach.
 - `flows.dry`/`flows.wet` are each limited to their pump's `max_flow`
-  (`rig-multi-sensor.yaml`: 2.0 L/min per line) — the limit *is* the `max_flows.dry`
-  config signal, so the command form shows it and the rig clamps to it.
+  (`rig-multi-sensor.yaml`: 2.0 L/min per line) — the top of the flow's own
+  `limits`, so the command form shows it and the rig clamps to it.
 - `efforts.dry`/`efforts.wet` are limited to `[0, 1]`.
 - A rig file may narrow `flows.dry`/`flows.wet` (`limits: [0, 1.5]`): the
   blend is then allocated inside the narrower limit, and each line's effort
@@ -189,7 +204,6 @@ fallback is always visible).
 `flyball-linux` — sysfs `/sys/class/pwm/pwmchip0`, no extra library);
 `dry`/`wet` are each a channel number, a deadband (0–1, below which the
 pump doesn't turn) and a max flow. The driver also takes a `frequency_hz`
-(default 20 000 Hz), the PWM carrier both lines share. A rig with no
-sensor bound to `dry`/`wet` may give a starting `supply: { dry: …, wet: …
-}` instead of `inputs` — see `DualPumpBlenderConfig.supply` in
-`blender.py`.
+(default 20 000 Hz), the PWM carrier both lines share. `inputs` gives each
+supply line's humidity: a sensor's address, or a number for a line with
+none (`inputs: { dry: 36.5, wet: 88.5 }`).

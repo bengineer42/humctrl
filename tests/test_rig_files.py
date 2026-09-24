@@ -20,7 +20,7 @@ from flyball_linux.links.i2c import FakeI2c
 from flyball_linux.links.pwm import FakePwm
 
 import humidity  # ruff: ignore[unused-import]
-from humidity.blender import DualPumpBlender, DualPumpBlenderConfig, PumpLineConfig, SupplyConfig
+from humidity.blender import DualPumpBlender, DualPumpBlenderConfig, PumpLineConfig
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,6 +31,17 @@ def test_rig_yaml_validates() -> None:
     assert config.devices["hum_sensors"].driver == "sht4x_set"
     assert config.devices["blender"].driver == "dual_pump_blender"
     assert "blender.humidity" in config.controllers
+
+
+def test_the_single_sensor_rig_binds_the_supplies_to_numbers() -> None:
+    config = load_rig_config(ROOT / "rig-single-sensor.yaml")
+    assert config.devices["blender"].inputs == {"dry": 36.5, "wet": 88.5}
+    assert "supply" not in config.devices["blender"].driver_config
+
+
+def test_blender_yaml_alone_is_refused_for_its_unbound_supplies() -> None:
+    with pytest.raises(Exception, match="neither bound nor a number"):
+        load_rig_config(ROOT / "blender.yaml")
 
 
 def test_rig_yaml_overlaid_with_sim_yaml_builds_headless() -> None:
@@ -49,7 +60,6 @@ def _real_blender() -> DualPumpBlender:
         link="pwm0",
         dry=PumpLineConfig(channel=0, deadband=0.05, max_flow=2.0),
         wet=PumpLineConfig(channel=1, deadband=0.05, max_flow=2.0),
-        supply=SupplyConfig(dry=10.0, wet=90.0),
     )
     # As `DeviceEntry.build` substitutes a link name for the built object: `model_copy`
     # bypasses validation, since `FakePwm` is not one of `PwmLinkConfig`'s union members.

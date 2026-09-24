@@ -97,8 +97,8 @@ pumps — but the result isn't what was asked for:
 - **The two supply humidities aren't in order**:
   `humidity.blender.SupplyHumiditiesError` — `wet` must read (or be
   configured) greater than `dry`, or there is no span to blend across.
-  Raised at build time from a configured `supply:`, or at `commit` time if
-  the bound sensors' readings cross (the wet line reading drier than the
+  Raised at `commit` time if the supplies' values cross -- numbers given
+  the wrong way round in `inputs`, or bound sensors' readings that cross (the wet line reading drier than the
   dry line, say, or a swapped I2C address).
 
 ## A pump write fails

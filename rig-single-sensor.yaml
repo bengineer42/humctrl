@@ -1,10 +1,9 @@
 # yaml-language-server: $schema=rig.schema.json
 # Minimal bring-up variant of rig-multi-sensor.yaml: one SHT4x on the chamber, wired
 # directly to I2C (`sht4x`) instead of one of three in a bank (`sht4x_set`,
-# rig-multi-sensor.yaml's `hum_sensors`). No dry/wet line sensors at all -- the blender
-# is left unbound on both, so it uses its own built-in supply humidities
-# (dry 0 %RH, wet 100 %RH -- theoretical dry/saturated air) instead of a
-# sensor reading. Same pumps, same controller, same addresses otherwise.
+# rig-multi-sensor.yaml's `hum_sensors`). No dry/wet line sensors: the blender's
+# supply inputs are bound to numbers instead. Same pumps, same controller, same
+# addresses otherwise.
 #
 #   flyball-runner rig-single-sensor.yaml
 
@@ -25,8 +24,10 @@ devices:
       humidity: { label: Chamber humidity }
       temperature: { label: Chamber temperature }
 
-  # blender: declared in blender.yaml, nothing added here -- with no dry/wet sensor to
-  # bind, its `supply` stays at the default (dry 0 %RH, wet 100 %RH).
+  blender:                                 # declared in blender.yaml; here only its inputs
+    # Measured 22 Sep on the real rig -- each pump run alone at full effort until the
+    # chamber's own reading settled. Supersedes an earlier guess (35/90.5).
+    inputs: { dry: 36.5, wet: 88.5 }         # %RH: no line sensors, so numbers
 
 controllers:
   blender.humidity:

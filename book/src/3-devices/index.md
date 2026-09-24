@@ -67,8 +67,11 @@ blend should be delivering, published alongside the readbacks.
 
 `blender.inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }`
 means the blender *follows* the two supply sensors: whenever either
-publishes, `blender.observe` records the new supply humidity, ready for the
-next `commit` — no bus poll of its own for that half of the picture.
+publishes, the rig commits the blender, which reads the new supply humidity
+through the input -- no bus poll of its own for that half of the picture. A
+rig with no line sensors binds them to numbers instead
+(`rig-single-sensor.yaml`: `inputs: { dry: 36.5, wet: 88.5 }`); there is no
+default, so every humidity rig file gives both.
 
 ## The controller
 

@@ -2,10 +2,12 @@
 # The pump blender, shared by every humidity rig file (`extends: [blender.yaml]`):
 # the PWM chip it drives and the `dual_pump_blender` device on it. A rig file
 # adds what differs -- its sensors, the controller that regulates `blender.humidity`
-# from one of them, and (rig-multi-sensor.yaml) `inputs:` so the blender reads the
-# supply lines' humidity instead of assuming dry 0 %RH / wet 100 %RH.
+# from one of them, and the blender's `inputs:`, the supply lines' humidity: a
+# number each (rig-single-sensor.yaml) or a sensor each (rig-multi-sensor.yaml).
+# The blender has no default for them, so this file does not load on its own.
 #
-# Not a rig on its own: `flyball-runner blender.yaml` has no sensor to regulate from.
+# Not a rig on its own: `flyball-runner blender.yaml` has no sensor to regulate from,
+# and no supply humidities.
 #
 # runner.port is moved off flyball's default (8000) so `flyball run`'s embedded dashboard
 # (runner.run.serve_ui, below) can sit on :8000 instead without a bind collision -- see
@@ -35,15 +37,12 @@ devices:
     dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
     wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
     blend_flow: 1.0
-    # Measured 22 Sep on the real rig (single-sensor: dry/wet unbound, so these
-    # are the only source of truth) -- each pump run alone at full effort until
-    # the chamber's own reading settled. Supersedes an earlier guess (35/90.5).
-    supply: { dry: 36.5, wet: 88.5 }
     # signals the driver declares (no poll: it pushes from commit and its commands):
-    #   humidity                 demand   %RH, limits [0, 100]  the split-range target; a controller's
-    #   flows.dry, flows.wet     demand   L/min    read-only readbacks; set only by set_flows
+    #   humidity                 demand   %RH, limits [dry, wet] from its inputs  the split-range target
+    # inputs (each rig file gives them; no default): dry, wet -- each line's humidity, %RH
+    #   flows.dry, flows.wet     demand   L/min    read-only readbacks; set only by set_flows;
+    #                                              limits [0, dry/wet max_flow]
     #   efforts.dry, efforts.wet demand   0-1 of full read-only readbacks; set only by set_efforts
     #   expected_humidity        readout  %RH                   what the lines actually deliver
     #   mode                     readout  humidity|flows        which demand is in control
     #   blend                    setting  the flow a humidity demand mixes to; set_blend
-    #   max_flows.dry/.wet       config   L/min                 from dry/wet max_flow

@@ -14,10 +14,14 @@ from flyball.foundation.device import (
     NodeSpec,
     Readable,
     Role,
+    NoValue,
+    Quality,
+    Reason,
     Sample,
     SignalSpec,
     invalid,
     not_applicable,
+    stale,
 )
 from flyball.foundation.errors import ConflictError, NotReadyError
 from flyball.foundation.typing import Normalised
@@ -31,7 +35,6 @@ from humidity.blender import (
     KeepBlendFlow,
     Mode,
     PumpLineConfig,
-    SupplyConfig,
     SupplyHumiditiesError,
     calculate_wet_fraction,
 )
@@ -108,10 +111,9 @@ def blender(
     rig: Any, fresh: Any, pumps: tuple[DualPumps, RecordingPump, RecordingPump]
 ) -> DualPumpBlender:
     dual_pumps, _, _ = pumps
-    device = DualPumpBlender(
-        fresh("blender"), dual_pumps, supply=SupplyHumidities(dry=10.0, wet=90.0), blend_flow=1.0
-    )
+    device = DualPumpBlender(fresh("blender"), dual_pumps, blend_flow=1.0)
     rig.add_device(device)
+    rig.bind_inputs(device, {"dry": 10.0, "wet": 90.0})  # numbers: no default any more
     return device
 
 
@@ -138,13 +140,14 @@ class TestTree:
         assert roles["blend.wet_fraction"] == (Role.DEMAND, Access.RP), (
             "readback only: set_fraction is the only way to move it"
         )
-        assert roles["max_flows.dry"] == (Role.CONFIG, Access.R)
+        assert not any(p.startswith(("max_flows", "supply_defaults")) for p in roles), (
+            "build-time numbers are not signals"
+        )
         assert blender.signals["flows.dry"].tags == {"line": "dry"}
         assert blender.signals["efforts.wet"].tags == {"line": "wet"}
-        assert blender.dry_flow.limits == (0.0, 2.0), "from the max_flows.dry config signal"
-        assert blender.humidity.limits == (10.0, 90.0), "the supply inputs' defaults, unbound"
+        assert blender.dry_flow.limits == (0.0, 2.0), "the pump's max_flow: metadata of the flow"
+        assert blender.humidity.limits == (10.0, 90.0), "the supply inputs, bound to numbers"
         assert blender.mode.value is Mode.FLOWS, "nothing drives the pumps until asked"
-        assert blender.dry_max_flow.value == pytest.approx(2.0)
 
     def test_commands_and_their_links(self) -> None:
         commands = DualPumpBlender.commands
@@ -209,7 +212,7 @@ class TestCommands:
     ) -> None:
         _, dry, _ = pumps
         dry_h = sensors.signals["dry.humidity"]
-        rig.bind_inputs(blender, {"dry": dry_h.address})
+        rig.bind(blender.dry_supply, dry_h.address)
         rig.run_command(blender, "set_flows", {"dry": 0.4, "wet": 0.6})
         rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 5.0})])
         assert dry.calls == [0.2], "not in `humidity` mode: the supply reading does not re-blend"
@@ -261,7 +264,9 @@ class TestOneCommitPerDelivery:
         _, dry, wet = pumps
         dry_h = sensors.signals["dry.humidity"]
         chamber_h = sensors.signals["chamber.humidity"]
-        rig.bind_inputs(blender, {"dry": dry_h.address})
+        rig.bind(blender.dry_supply, dry_h.address)
+        rig.on_samples([Sample(sensors.nodes["dry"], 0, {dry_h: 4.0})])  # its limit is known
+        assert dry.calls == [], "flows mode: a supply reading writes nothing"
         controller = rig.attach_controller(blender.humidity, chamber_h, law=P(kp=1.0))
         controller.regulate(50.0, transfer=Transfer.COLD)
         assert len(dry.calls) == 1, "arming the controller writes once, outside a delivery"
@@ -279,9 +284,9 @@ class TestSupplyLimits:
         self, rig: Any, sensors: Sensors, blender: DualPumpBlender
     ) -> None:
         dry_h = sensors.signals["dry.humidity"]
-        rig.bind_inputs(blender, {"dry": dry_h.address})
+        rig.bind(blender.dry_supply, dry_h.address)
         rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 25.0})])
-        assert blender.humidity.limits == (25.0, 90.0), "the bound dry line, the wet default"
+        assert blender.humidity.limits == (25.0, 90.0), "the bound dry line, the wet number"
         states = rig.write(blender.root, {"humidity": 5.0})
         assert states[blender.humidity].value == pytest.approx(25.0)
         assert states[blender.humidity].requested == pytest.approx(5.0)
@@ -309,7 +314,7 @@ class TestNoValue:
     ) -> None:
         _, dry, _ = pumps
         dry_h = sensors.signals["dry.humidity"]
-        rig.bind_inputs(blender, {"dry": dry_h.address})
+        rig.bind(blender.dry_supply, dry_h.address)
         rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 20.0})])
         rig.write(blender.root, {"humidity": 50.0})
         writes = len(dry.calls)
@@ -317,7 +322,9 @@ class TestNoValue:
         assert len(dry.calls) == writes, "nothing blended: the pumps keep their blend"
         codes = [c.code for c in rig.conditions.of(blender)]
         assert codes == ["supply_unknown"], "not commit_failed: the write did not fail"
-        assert rig.router.latest[blender.expected_humidity].value == invalid("supply")
+        assert rig.router.latest[blender.expected_humidity].value == invalid("crc"), (
+            "the output carries the input's quality"
+        )
         assert rig.router.latest[blender.humidity].usable, "the demand is not stale"
         with pytest.raises(NotReadyError):
             rig.run_command(blender, "set_humidity", {"humidity": 40.0})
@@ -325,6 +332,57 @@ class TestNoValue:
             rig.write(blender.root, {"humidity": 40.0})  # its limit follows the supply
         rig.on_samples([Sample(sensors.nodes["dry"], 3, {dry_h: 20.0})])
         assert len(dry.calls) == writes + 1 and rig.conditions.of(blender) == []
+
+    def test_a_supply_going_stale_while_blending_holds_the_blend(
+        self,
+        rig: Any,
+        sensors: Sensors,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, _ = pumps
+        dry_h = sensors.signals["dry.humidity"]
+        rig.bind(blender.dry_supply, dry_h.address)
+        rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 20.0})])
+        rig.write(blender.root, {"humidity": 50.0})
+        writes = len(dry.calls)
+        rig.on_samples([Sample(sensors.nodes["dry"], 2, {dry_h: stale(Reason.DEVICE_OFFLINE)})])
+        assert len(dry.calls) == writes, "nothing blended while the supply is stale"
+        assert rig.router.latest[blender.expected_humidity].value == NoValue(
+            Quality.STALE, "device_offline"
+        ), "stale, with the sensor's reason: not a number from an old supply"
+        assert [c.code for c in rig.conditions.of(blender)] == ["supply_unknown"]
+        assert blender.dry_supply.quality is Quality.STALE
+
+    def test_set_humidity_is_refused_while_a_supply_is_pending(
+        self,
+        rig: Any,
+        sensors: Sensors,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, _ = pumps
+        dry_h = sensors.signals["dry.humidity"]
+        rig.bind(blender.dry_supply, dry_h.address)  # never read yet
+        assert blender.dry_supply.quality is Quality.PENDING
+        with pytest.raises(NotReadyError, match=r"'dry' \(pending\)"):
+            rig.run_command(blender, "set_humidity", {"humidity": 40.0})  # names the input
+        assert dry.calls == [] and blender.mode.value is Mode.FLOWS, "nothing blended"
+        with pytest.raises(NotReadyError, match=r"'dry' \(pending\)"):
+            rig.write(blender.root, {"humidity": 40.0})
+
+    def test_nothing_is_blended_before_a_humidity_demand(
+        self,
+        rig: Any,
+        sensors: Sensors,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, _ = pumps
+        dry_h = sensors.signals["dry.humidity"]
+        rig.bind(blender.dry_supply, dry_h.address)
+        rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 20.0})])
+        assert dry.calls == [], "a supply reading with no target blends nothing"
 
 
 class TestFlowsAndEffortsNotDirectlyWritable:
@@ -428,7 +486,6 @@ def test_the_config_builds_a_working_blender_on_a_fake_pwm_chip(fresh: Any) -> N
         link="pwm0",
         dry=PumpLineConfig(channel=0, deadband=0.05, max_flow=2.0),
         wet=PumpLineConfig(channel=1, deadband=0.05, max_flow=2.0),
-        supply=SupplyConfig(dry=10.0, wet=90.0),
     )
     device = config.model_copy(update={"link": chip}).build(fresh("blender"))
     device.set_flows(0.4, 0.6)
@@ -447,7 +504,7 @@ class TestHonesty:
             "58 %RH: the model run backwards, not the last target"
         )
         dry_h = sensors.signals["dry.humidity"]
-        rig.bind_inputs(blender, {"dry": dry_h.address})
+        rig.bind(blender.dry_supply, dry_h.address)
         rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 20.0})])
         assert blender.humidity.value == pytest.approx(0.4 * 20.0 + 0.6 * 90.0), (
             "a moved supply moves what the same flows deliver"

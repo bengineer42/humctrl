@@ -161,9 +161,6 @@ class SupplyHumidities(DryWet):
     wet: Humidity
 
 
-DefaultHumidities = SupplyHumidities(dry=0.0, wet=100.0)
-
-
 @dataclass(slots=True, frozen=True)
 class SupplyFlows(DryWet):
     dry: Flow
