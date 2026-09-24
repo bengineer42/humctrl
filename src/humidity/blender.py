@@ -162,13 +162,15 @@ class DualPumpBlender(Committable):
     # a Demand, so the generic signal editor does not offer a direct write that would be
     # silently accepted and never reach the pumps. Their limits' top is each pump's
     # `max_flow`, set on the instance in `__init__`: metadata of the flow, not a signal.
-    dry_flow = flows.demand("dry", "Dry pump flow", FLOW, access=Access.RP, tags=DRY)
-    wet_flow = flows.demand("wet", "Wet pump flow", FLOW, access=Access.RP, tags=WET)
+    # `off=0`: a pump at no flow, no effort is off. A fact, not what a stop writes: they are
+    # readbacks, and the blender's stop is its `stop` command.
+    dry_flow = flows.demand("dry", "Dry pump flow", FLOW, access=Access.RP, tags=DRY, off=0.0)
+    wet_flow = flows.demand("wet", "Wet pump flow", FLOW, access=Access.RP, tags=WET, off=0.0)
     dry_effort = efforts.demand(
-        "dry", "Dry pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP, tags=DRY
+        "dry", "Dry pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP, tags=DRY, off=0.0
     )
     wet_effort = efforts.demand(
-        "wet", "Wet pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP, tags=WET
+        "wet", "Wet pump effort", EFFORT, limits=(0.0, 1.0), access=Access.RP, tags=WET, off=0.0
     )
 
     expected_humidity = Readout(
@@ -463,9 +465,15 @@ class DualPumpBlender(Committable):
         self._pumps.set_efforts(SupplyEfforts(dry, wet))
         self._push_readbacks(flows_in_force=True)
 
-    @command(mode=Mode.FLOWS, interrupts=True)
+    @command(mode=Mode.FLOWS, interrupts=True, stops=True)
     def stop(self) -> None:
-        """Stop both pumps at once; a controller driving the target goes to manual."""
+        """Stop both pumps at once; a controller driving the target goes to manual.
+
+        The blender's stop: a rig stop (the Software stop, a shutdown, `on_fault:
+        stop` or `stop_device` on its controller) runs this, and a rig file's `stop:`
+        values are refused on it -- `commit` ignores the flows and efforts, so a value
+        would never reach the pumps.
+        """
         self._kept = None
         self._pumps.stop()
         self._push_readbacks(flows_in_force=True)

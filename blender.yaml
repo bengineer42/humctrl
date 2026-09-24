@@ -46,3 +46,5 @@ devices:
     #   expected_humidity        readout  %RH                   what the lines actually deliver
     #   mode                     readout  humidity|flows        which demand is in control
     #   blend                    setting  the flow a humidity demand mixes to; set_blend
+    # its stop (the Software stop, a shutdown, on_fault stop/stop_device): the `stop`
+    # command, both pumps off -- `stop:` values are refused on this device

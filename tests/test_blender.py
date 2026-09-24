@@ -456,6 +456,25 @@ def test_stop_is_a_command_not_a_demand(
     assert blender.dry_flow.value == pytest.approx(0.0) and blender.mode.value is Mode.FLOWS
 
 
+def test_stop_is_the_blenders_stop(
+    rig: Any, blender: DualPumpBlender, pumps: tuple[DualPumps, RecordingPump, RecordingPump]
+) -> None:
+    """A rig stop runs `blender.stop`; a rig file's `stop:` values are refused on it."""
+    from flyball.foundation.device.entry import _set_stops
+    from flyball.rig.stopping import Actor, RigStopper
+
+    _, dry, wet = pumps
+    assert blender.stops_by() == "stop"
+    with pytest.raises(ValueError, match="stopped by its driver's 'stop' command"):
+        _set_stops(blender, {"humidity": 50.0})
+    rig.run_command(blender, "set_flows", {"dry": 1.0, "wet": 1.0})
+    report = RigStopper(rig).stop(Actor("ben", "", "human", "http"), "test")
+    assert report.devices[blender.name]["state"] == "stopped"
+    assert dry.effort == pytest.approx(0.0) and wet.effort == pytest.approx(0.0)
+    with pytest.raises(ConflictError, match="stopped by ben"):
+        rig.run_command(blender, "set_flows", {"dry": 1.0, "wet": 1.0})
+
+
 class TestPwmPump:
     """The pumps write duties through `PwmLink`, not their own hardware library."""
 
