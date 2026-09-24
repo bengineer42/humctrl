@@ -42,12 +42,11 @@ humidity = "humidity.configs"
 # still happening to sit nested inside a flyball checkout. Bump the rev by hand when flyball
 # moves and this needs to follow.
 #
-# Pinned to `dev`'s tip (23 Sep, bcec29c): signal-faults wave 0 -- rig-file limits narrow the
-# driver's, a held controller freezes, the blender's inner demands are readbacks. Needs the
-# `server` extra (renamed from `web` at 62733c3), hence `flyball[server]` above.
-flyball = { git = "https://github.com/bengineer42/flyball", rev = "bcec29c9952b5533b12e136b40afc77a522a8a5f", subdirectory = "engine" }
-flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "bcec29c9952b5533b12e136b40afc77a522a8a5f", subdirectory = "extensions/linux" }
-flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "bcec29c9952b5533b12e136b40afc77a522a8a5f", subdirectory = "extensions/chips" }
+# Pinned to `dev`'s tip (24 Sep, 05bcd9c): signal-faults waves 1-3 (the renames, the real stop
+# and latch, rig edits restart), auth Phase 1 (`runner.front`), the calibration curve.
+flyball = { git = "https://github.com/bengineer42/flyball", rev = "05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc", subdirectory = "engine" }
+flyball-linux = { git = "https://github.com/bengineer42/flyball", rev = "05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc", subdirectory = "extensions/linux" }
+flyball-chips = { git = "https://github.com/bengineer42/flyball", rev = "05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc", subdirectory = "extensions/chips" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/humidity"]

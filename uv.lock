@@ -380,7 +380,7 @@ wheels = [
 [[package]]
 name = "flyball"
 version = "0.1.0"
-source = { git = "https://github.com/bengineer42/flyball?subdirectory=engine&rev=bcec29c9952b5533b12e136b40afc77a522a8a5f#bcec29c9952b5533b12e136b40afc77a522a8a5f" }
+source = { git = "https://github.com/bengineer42/flyball?subdirectory=engine&rev=05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc#05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc" }
 dependencies = [
     { name = "pydantic" },
     { name = "tomli-w" },
@@ -400,7 +400,7 @@ server = [
 [[package]]
 name = "flyball-chips"
 version = "0.1.0"
-source = { git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Fchips&rev=bcec29c9952b5533b12e136b40afc77a522a8a5f#bcec29c9952b5533b12e136b40afc77a522a8a5f" }
+source = { git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Fchips&rev=05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc#05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc" }
 dependencies = [
     { name = "flyball" },
     { name = "flyball-sim" },
@@ -409,7 +409,7 @@ dependencies = [
 [[package]]
 name = "flyball-linux"
 version = "0.1.0"
-source = { git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Flinux&rev=bcec29c9952b5533b12e136b40afc77a522a8a5f#bcec29c9952b5533b12e136b40afc77a522a8a5f" }
+source = { git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Flinux&rev=05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc#05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc" }
 dependencies = [
     { name = "flyball" },
     { name = "flyball-chips" },
@@ -424,7 +424,7 @@ i2c = [
 [[package]]
 name = "flyball-sim"
 version = "0.1.0"
-source = { git = "https://github.com/bengineer42/flyball?subdirectory=sim&rev=bcec29c9952b5533b12e136b40afc77a522a8a5f#bcec29c9952b5533b12e136b40afc77a522a8a5f" }
+source = { git = "https://github.com/bengineer42/flyball?subdirectory=sim&rev=05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc#05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc" }
 dependencies = [
     { name = "flyball" },
 ]
@@ -596,9 +596,9 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "flyball", extras = ["server"], git = "https://github.com/bengineer42/flyball?subdirectory=engine&rev=bcec29c9952b5533b12e136b40afc77a522a8a5f" },
-    { name = "flyball-chips", git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Fchips&rev=bcec29c9952b5533b12e136b40afc77a522a8a5f" },
-    { name = "flyball-linux", extras = ["i2c"], git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Flinux&rev=bcec29c9952b5533b12e136b40afc77a522a8a5f" },
+    { name = "flyball", extras = ["server"], git = "https://github.com/bengineer42/flyball?subdirectory=engine&rev=05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc" },
+    { name = "flyball-chips", git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Fchips&rev=05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc" },
+    { name = "flyball-linux", extras = ["i2c"], git = "https://github.com/bengineer42/flyball?subdirectory=extensions%2Flinux&rev=05bcd9c0d1078f65a7cb20b1a2f75ee3f5b086bc" },
 ]
 
 [package.metadata.requires-dev]
