@@ -59,7 +59,7 @@ demand, the controller's output, and `blender.humidity` is exactly that
 controller's name. The rest
 are readbacks, `[RP]` not `[RPW]`: a direct demand on `flows.dry`,
 `efforts.wet`, `blend.wet_fraction` or `blend.flow` is refused ("not
-writable") rather than silently dropped, because `commit` only ever reads
+writable", naming the command that moves it) rather than silently dropped, because `commit` only ever reads
 `humidity`'s pending value. Drive the lines through `set_flows`,
 `set_efforts`, `set_fraction` or `set_blend` instead — see [The blender
 device](blender.md). `expected_humidity` is what `commit` computes the

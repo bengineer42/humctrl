@@ -61,9 +61,14 @@ API, or a raised `ConflictError` from a script — and change nothing:
 
 - **A direct demand on a readback.** `flows.dry`/`flows.wet`,
   `efforts.dry`/`efforts.wet` and `blend.wet_fraction` are readbacks
-  (`[RP]`), not writable directly — "`'…flows.dry' [RP] is not
-  writable`". Drive them through `set_flows`/`set_efforts`/`set_fraction`
-  instead. See [The blender device](../3-devices/blender.md).
+  (`[RP]`), not writable directly — "`'…flows.dry' [rp] is not
+  writable: it is a readback, moved by the command 'set_flows' (it puts a
+  regulating controller in manual)`". Drive them through the command it
+  names (`set_flows`/`set_efforts`/`set_fraction`). See [The blender
+  device](../3-devices/blender.md).
+- **`set_blend` while a controller regulates `humidity`** — "`is driven by
+  controller 'blender.humidity': 'set_blend' would fight it`". Put the
+  controller in manual first.
 - **A demand on a signal a controller drives.** `blender.humidity` while
   `blender.humidity` (the controller) is regulating — put it in `manual`
   first (a program step, or `POST /api/controllers/blender.humidity/manual`).
@@ -83,8 +88,10 @@ pumps — but the result isn't what was asked for:
 - **The requested flow exceeds what the blend can deliver**:
   `humidity.pumps.errors.FlowsOverdrivenError` — raised by
   `DualPumps.set_flows`/`validate_flows` for a `set_flows` command that
-  exceeds a line's `max_flow`. A `humidity` demand instead goes through
-  `Absolute(flow, OnOverdrive.CLAMP)`, so `commit`'s own split-range path
+  exceeds a line's `max_flow`, and by `set_blend`/`set_humidity`/`set_fraction`
+  with an `Absolute(…, raise)` blend flow the mix cannot move (the
+  controller, if any, is left regulating). A `humidity` demand's blend
+  always scales, even with `raise`, so `commit`'s own split-range path
   derates to what's achievable rather than raising — see
   [Limits](limits.md#flow).
 - **The two supply humidities aren't in order**:

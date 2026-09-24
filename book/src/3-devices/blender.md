@@ -13,13 +13,13 @@ per input. People run its commands, which drive the lines at once.
 
 | signal | role | what it is |
 | --- | --- | --- |
-| `humidity` | demand | the split-range target; a controller usually owns this |
+| `humidity` | demand | the split-range target; a controller usually owns this. In `flows` mode its readback is what the flows deliver (see below) |
 | `flows.dry`, `flows.wet` | demand, read-only | each line's flow, L/min: the readback, set only by `set_flows` -- not directly writable |
 | `efforts.dry`, `efforts.wet` | demand, read-only | each line's effort, 0–1 of full: the readback, set only by `set_efforts` -- not directly writable |
-| `expected_humidity` | output | what the current pump outputs should actually deliver |
+| `expected_humidity` | output | what the current pump outputs should actually deliver; no value with no flow |
 | `mode` | readout | which demand is in control: `humidity` (a humidity demand, or `set_humidity`) or `flows` (`set_flows`, `set_efforts`, `set_fraction`, `stop`) |
-| `blend.flow` | setting | the flow a `humidity` demand mixes to; `set_blend` |
-| `blend.wet_fraction` | demand, read-only | the share drawn from the wet line: the readback while blending, set only by `set_fraction` -- not directly writable |
+| `blend.flow` | setting | the flow a `humidity` demand mixes to; `set_blend` (refused while a controller regulates `humidity`) |
+| `blend.wet_fraction` | demand, read-only | the share drawn from the wet line: the readback while blending, set only by `set_fraction` -- not directly writable; no value with no flow |
 | `max_flows.dry`, `max_flows.wet` | config | each line's maximum, the limit of its flow demand |
 
 `flows.*`, `efforts.*` and `blend.wet_fraction` are declared `access=Access.RP`
@@ -28,7 +28,19 @@ per input. People run its commands, which drive the lines at once.
 silently dropped -- the pumps would never move. The generic signal editor
 reads a signal's access from its spec, so declaring them this way is
 enough to stop it offering a write control for them; drive the lines
-through `set_flows`/`set_efforts`/`set_fraction` instead.
+through `set_flows`/`set_efforts`/`set_fraction` instead. The rig's
+refusal names the command: "`'blender.flows.dry' [rp] is not writable: it
+is a readback, moved by the command 'set_flows' (it puts a regulating
+controller in manual)`".
+
+In `flows` mode `humidity`'s readback is what the lines deliver from the
+supplies now -- the model run backwards, the same number as
+`expected_humidity` -- not the last target. Every flows command pushes it,
+and a moved supply reading moves it again. So a controller in manual
+tracks what is delivered, and the card shows it. With no flow (after
+`stop`) it and `blend.wet_fraction` have no value (`not_applicable`,
+reason `no_flow`): a `set_fraction` then needs its `wet_fraction` given,
+since there is none to fill it from.
 
 The mode, named after the demand in control, decides what a delivery does.
 A `humidity` demand puts the blender in `humidity` mode, where a moved
@@ -64,8 +76,10 @@ or `"high"`. Only a wet-humidity-not-greater-than-dry configuration raises
 (`SupplyHumiditiesError`): with no span there is nothing to blend.
 
 The fraction, `blend` (the setting) and `pumps.set_blend(...)` then
-give the actual dry/wet flows, which each line's `PwmPump.set_effort`
-turns into a PWM duty ratio (`calculate_duty_ratio`, honouring that line's
+give the actual dry/wet flows, allocated inside each line's *effective*
+flow limit (`flows.dry`/`flows.wet`'s limits after a rig file's `limits`
+narrowing, not only the pump's `max_flow`). Each line's
+`PwmPump.set_effort` turns its flow into a PWM duty ratio (`calculate_duty_ratio`, honouring that line's
 `deadband`) and writes straight to `flyball-linux`'s `PwmLink` protocol —
 `configure(channel, period_ns, duty_ns)` then `enable(channel, ...)`. The
 blender owns both channels directly rather than wrapping a `pwm_channel`
@@ -114,13 +128,45 @@ the supplies, which are not known), a controller driving it holds
   (`rig-multi-sensor.yaml`: 2.0 L/min per line) — the limit *is* the `max_flows.dry`
   config signal, so the command form shows it and the rig clamps to it.
 - `efforts.dry`/`efforts.wet` are limited to `[0, 1]`.
+- A rig file may narrow `flows.dry`/`flows.wet` (`limits: [0, 1.5]`): the
+  blend is then allocated inside the narrower limit, and each line's effort
+  is still worked out against its pump's `max_flow`.
 - `set_humidity(humidity, blend_flow)` blends to a target by hand, at a
   blend flow, in one go — what a controller does through the `humidity`
   demand; `set_flows` and `set_efforts` take one value per line. An
   argument left out is filled from its linked signal's current reading and
-  re-applied. They are refused while a controller drives
-  `humidity` (put it in manual, or detach it); `stop` is exempt and stops
-  both pumps at once, whatever is driving them.
+  re-applied. These commands, `set_fraction` and `stop` put a controller
+  regulating `humidity` in manual -- once the command has succeeded, so one
+  that is refused (an overdrive) leaves it regulating -- and the response's
+  `interrupted` names it. `stop` stops both pumps at once, whatever is
+  driving them.
+- `set_blend` is refused while a controller regulates `humidity`: it moves
+  the pumps under the controller (a zero blend flow would wind it up against
+  no air). Put the controller in manual first.
+
+## Blend flow
+
+`blend.flow` is one of:
+
+| value | wire | means |
+| --- | --- | --- |
+| `Absolute(flow, on_overdrive)` | `{flow, on_overdrive: "raise" \| "clamp"}` | this many L/min. `clamp` scales both lines down, keeping the mix, when the mix cannot move that much; `raise` refuses -- but only a command run by hand (`set_blend`, `set_humidity`, `set_fraction`). A blend a humidity demand or a moved supply makes always scales, so a controller's write is never refused |
+| `OfBlendMax(blend_fraction)` | `{blend_fraction}` | a share of the most this mix can move |
+| `OfGuaranteedMax(guaranteed_max_fraction)` | `{guaranteed_max_fraction}` | a share of the flow every mix can move (the smaller line's limit) |
+| `KeepTotal(fallback)` | `{keep: true, fallback?}` | keep the total flow the pumps move when the blender enters `humidity` mode |
+
+`KeepTotal` is opt-in. It resolves once on each entry into `humidity` mode
+(a humidity demand from `flows` mode, or `set_humidity`) to
+`Absolute(<the total then>, clamp)`, held for that episode and not worked
+out again at each blend, so a supply reading does not ratchet it down. At
+or below 1 % of the guaranteed maximum flow (the pumps stopped, or just
+started) it uses `fallback` instead; none means the configured
+`blend_flow`, scaling. A `set_blend(KeepTotal)` in `humidity` mode
+resolves at once, to the total now. `blend.flow` keeps showing `KeepTotal`;
+the resolved total is `set_humidity`'s result and a `blend_flow_kept`
+event (`details: {total, fallback, delivered, clamped}`; a warning when
+the new mix cannot deliver the kept total). Switching into `humidity`
+mode is bumpless in total flow only within what the new mix can move.
 
 ## Config
 
@@ -131,9 +177,13 @@ blender:
   link: pwm0
   dry: { channel: 0, deadband: 0.05, max_flow: 2.0 }   # L/min
   wet: { channel: 1, deadband: 0.05, max_flow: 2.0 }
-  blend_flow: 1.0
+  blend_flow: 1.0          # or { keep: true, fallback: 1.0 }
   inputs: { dry: hum_sensors.dry.humidity, wet: hum_sensors.wet.humidity }
 ```
+
+`blend_flow` is L/min, scaling to what the mix can move, or `{keep: true,
+fallback: <L/min>}` for a `KeepTotal` (there is no bare `keep`, so the
+fallback is always visible).
 
 `link` names a PWM chip link (`pwm0: { type: pwm, chip: 0 }`, from
 `flyball-linux` — sysfs `/sys/class/pwm/pwmchip0`, no extra library);

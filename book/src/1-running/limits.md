@@ -27,7 +27,9 @@ directly, and (being readbacks, not writable) are only ever moved by
 `set_flows`, which clamps its own `dry`/`wet` arguments the same way;
 `blend.flow [RP]` (the total flow a `humidity` demand mixes to, a
 setting re-set only by `set_blend`) is not itself limited by a signal
-range, but the resulting per-line flows still are.
+range, but the resulting per-line flows still are: the blend is
+allocated inside `flows.dry`/`flows.wet`'s effective limits, so a rig
+file's narrower `limits` on them bound the blend too.
 
 The achievable *total* flow depends on the blend, not just on the two
 `max_flow`s: at a wet fraction `b`, `dry_flow = (1−b)·total ≤ dry_max` and
@@ -39,9 +41,10 @@ min(dry_max, wet_max)` (4.0 L/min, with this rig's equal 2.0 L/min lines —
 the same number the simple sum would give here only because the two
 maxima happen to match; with unequal lines they'd differ).
 `MaxFlows.flows_at_blend` (`humidity/pumps/types.py`) is the exact
-computation; `Absolute(flow, OnOverdrive.CLAMP)` (what `commit` uses for a
-`humidity` demand) derates to whatever the blend can actually deliver
-rather than raising.
+computation; `Absolute(flow, OnOverdrive.CLAMP)` derates to whatever the
+blend can actually deliver rather than raising. A blend `commit` makes for
+a `humidity` demand always derates, even with `on_overdrive: raise`, which
+refuses only a command run by hand.
 
 ## Effort and deadband
 
