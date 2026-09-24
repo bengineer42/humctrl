@@ -86,7 +86,22 @@ is no callback and no copy on the device. In `humidity` mode that re-blends;
 in `flows` mode it does nothing. A rig with no sensor bound uses
 its `supply` field (the `supply_defaults` config signals) instead.
 `expected_humidity` is pushed after every pump write from the pumps'
-actual output and the current supply humidities.
+actual output and the current supply humidities. With no flow it has no
+value (`not_applicable`, reason `no_flow`: a chart breaks there rather than
+drawing the last blend), and while a supply has none it is `invalid`
+(reason `supply`).
+
+### A supply sensor with no value
+
+A bound supply sensor whose reading has no value (`invalid`, or `stale`
+once its device is offline) is never replaced by the config's `supply`
+humidity: in `humidity` mode nothing is blended, and the pumps keep what
+they are doing. The blender holds the `supply_unknown` condition (a
+warning) until the sensor reads again, when it blends at once and the
+condition clears. It is not a failed write, so the blender's demands stay
+as they were. Meanwhile a `humidity` demand is refused (its limits follow
+the supplies, which are not known), a controller driving it holds
+`limit_unknown`, and `set_humidity` refuses with 503.
 
 ## Limits
 

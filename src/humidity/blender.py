@@ -18,8 +18,13 @@ from flyball.foundation.device import (
     DriverConfig,
     Limit,
     Namespace,
+    NoValueError,
     Readout,
+    Severity,
+    Value,
     command,
+    invalid,
+    not_applicable,
 )
 from flyball.foundation.errors import UnachievableError
 from flyball.foundation.primitives import Labelled
@@ -98,6 +103,9 @@ class Mode(Labelled):
     FLOWS = "flows", "Flows set directly"
 
 
+SUPPLY_UNKNOWN = "supply_unknown"
+"""The blender's condition while a bound supply sensor has no value: nothing is blended."""
+
 DRY = {"line": "dry"}
 WET = {"line": "wet"}
 """Each line's signals share a `line` tag across the tree: `flows.dry`, `efforts.dry`, ..."""
@@ -109,7 +117,10 @@ class DualPumpBlender(Committable):
     A demand on `humidity` puts the blender in `humidity` mode: `commit` does the
     split-range arithmetic once per delivery (`calculate_wet_fraction`),
     however many of a new target, a changed supply reading and a new blend
-    flow arrived together -- one pump write. `set_flows`, `set_efforts` and
+    flow arrived together -- one pump write. While a bound supply sensor has no
+    value (`invalid`, `stale`), nothing is blended: the pumps keep what they
+    are doing, `expected_humidity` is `invalid("supply")`, the blender holds
+    `supply_unknown`, and `set_humidity` refuses (a `NotReadyError`). `set_flows`, `set_efforts` and
     `stop` drive the lines at once and put it in `flows` mode, so a supply
     reading re-blends only in `humidity` mode. The flows and efforts are demands whose
     readbacks follow whatever is driving the pumps.
@@ -185,17 +196,32 @@ class DualPumpBlender(Committable):
         return SupplyHumidities(dry=self.dry_supply.value, wet=self.wet_supply.value)
 
     def commit(self, time_ns: int) -> None:
-        """A humidity demand takes `humidity` mode; in it, a moved supply re-blends."""
+        """A humidity demand takes `humidity` mode; in it, a moved supply re-blends.
+
+        A supply with no value blends nothing, and is not a failed write: the
+        pumps keep their blend until the supply reads again.
+        """
         if (target := self.humidity.staged) is not None:
             self._target = target
             if self.mode.value is not Mode.HUMIDITY:
                 self.mode.push(Mode.HUMIDITY, time_ns)
         if self.mode.value is Mode.HUMIDITY:
-            self._blend_pumps(time_ns)
+            try:
+                self._blend_pumps(time_ns)
+            except NoValueError as error:
+                self.set_condition(
+                    SUPPLY_UNKNOWN, Severity.WARNING, f"{error}: nothing blended until it reads"
+                )
+                self.push(time_ns, expected_humidity=invalid("supply"))
 
     def _blend_pumps(self, time_ns: int | None = None, blend: BlendFlow | None = None) -> None:
-        """Put the blend on the pumps: the wet fraction for the target, the flow `blend` says."""
+        """Put the blend on the pumps: the wet fraction for the target, the flow `blend` says.
+
+        Raises:
+            NoValueError: A bound supply sensor has no value: nothing is blended.
+        """
         fraction = calculate_wet_fraction(self._supply, self._target)
+        self.clear_condition(SUPPLY_UNKNOWN, message="the supplies read again: blending")
         railed = isinstance(fraction, Limit)
         self.humidity.at_limit = fraction if railed else None
         wet = fraction.fraction if isinstance(fraction, Limit) else fraction
@@ -214,8 +240,9 @@ class DualPumpBlender(Committable):
     ) -> None:
         """What the pumps are now doing, on the flow and effort demands, and what it delivers.
 
-        `blend` only when given, `wet_fraction` the pumps' own unless given;
-        `expected_humidity` not at all with no flow: a None is not pushed.
+        `blend` only when given, `wet_fraction` the pumps' own unless given.
+        `expected_humidity` has no value with no flow (`not_applicable("no_flow")`:
+        a chart breaks, nothing reads 0) or while a supply has none (`invalid("supply")`).
         """
         output = self._pumps.output
         self.push(
@@ -225,9 +252,18 @@ class DualPumpBlender(Committable):
             wet_flow=output.flows.wet,
             dry_effort=output.efforts.dry,
             wet_effort=output.efforts.wet,
-            expected_humidity=expected_humidity_from_flows(output.flows, self._supply),
+            expected_humidity=self._expected(output.flows),
             blend_flow=blend,
         )
+
+    def _expected(self, flows: SupplyFlows) -> Value:
+        """The humidity `flows` deliver from the supplies now, or why there is none."""
+        try:
+            supply = self._supply
+        except NoValueError:
+            return invalid("supply")
+        expected = expected_humidity_from_flows(flows, supply)
+        return not_applicable("no_flow") if expected is None else expected
 
     @command
     def set_blend(self, blend_flow: BlendFlow) -> None:

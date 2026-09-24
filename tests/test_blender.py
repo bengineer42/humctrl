@@ -16,8 +16,10 @@ from flyball.foundation.device import (
     Role,
     Sample,
     SignalSpec,
+    invalid,
+    not_applicable,
 )
-from flyball.foundation.errors import ConflictError
+from flyball.foundation.errors import ConflictError, NotReadyError
 from flyball.foundation.typing import Normalised
 from flyball.model.law import Transfer
 from flyball_linux.links.pwm import FakePwm
@@ -271,6 +273,45 @@ class TestSupplyLimits:
         assert states[blender.humidity].value == pytest.approx(25.0)
         assert states[blender.humidity].requested == pytest.approx(5.0)
         assert states[blender.humidity].at_limit == Limit.LOW
+
+
+class TestNoValue:
+    """A supply sensor with no value blends nothing; no flow is no expected humidity."""
+
+    def test_with_no_flow_expected_humidity_is_not_applicable(
+        self, rig: Any, blender: DualPumpBlender
+    ) -> None:
+        rig.run_command(blender, "stop")
+        reading = rig.router.latest[blender.expected_humidity]
+        assert reading.value == not_applicable("no_flow")
+        rig.run_command(blender, "set_flows", {"dry": 1.0, "wet": 1.0})
+        assert rig.router.latest[blender.expected_humidity].value == pytest.approx(50.0)
+
+    def test_an_invalid_supply_blends_nothing_and_is_not_a_failed_write(
+        self,
+        rig: Any,
+        sensors: Sensors,
+        blender: DualPumpBlender,
+        pumps: tuple[DualPumps, RecordingPump, RecordingPump],
+    ) -> None:
+        _, dry, _ = pumps
+        dry_h = sensors.signals["dry.humidity"]
+        rig.bind_inputs(blender, {"dry": dry_h.address})
+        rig.on_samples([Sample(sensors.nodes["dry"], 1, {dry_h: 20.0})])
+        rig.write(blender.root, {"humidity": 50.0})
+        writes = len(dry.calls)
+        rig.on_samples([Sample(sensors.nodes["dry"], 2, {dry_h: invalid("crc")})])
+        assert len(dry.calls) == writes, "nothing blended: the pumps keep their blend"
+        codes = [c.code for c in rig.conditions.of(blender)]
+        assert codes == ["supply_unknown"], "not commit_failed: the write did not fail"
+        assert rig.router.latest[blender.expected_humidity].value == invalid("supply")
+        assert rig.router.latest[blender.humidity].usable, "the demand is not stale"
+        with pytest.raises(NotReadyError):
+            rig.run_command(blender, "set_humidity", {"humidity": 40.0})
+        with pytest.raises(NotReadyError):
+            rig.write(blender.root, {"humidity": 40.0})  # its limit follows the supply
+        rig.on_samples([Sample(sensors.nodes["dry"], 3, {dry_h: 20.0})])
+        assert len(dry.calls) == writes + 1 and rig.conditions.of(blender) == []
 
 
 class TestFlowsAndEffortsNotDirectlyWritable:
